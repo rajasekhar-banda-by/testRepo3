@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+<sub-flow name="Inbound_Inv_Sts_Flow" doc:id="f72e9b90-8c06-43ee-89d2-4096d5085fca" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="9d2aa0a7-2258-4e0f-98fa-8dbe2654f82d" variableName="Action"/>
+		<flow-ref doc:name="Store XML to Message Store" doc:id="e4738681-aa5b-4902-8823-a15ddd89b5b7" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8c50affd-f6e7-4d3b-ae64-6c54b2771320" message="#['\n\t stored XML into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="d0a57f95-88f3-4380-bb05-b4425598b70a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+fun getLoc(Location) = Location[1 to (sizeOf(Location)) -1 ]
+fun getSize(loc) = sizeOf(loc)
+var MuleId = uuid()
+var curDate = now() as String {format: 'yyyyMMdd'}
+var curTime = now() as String {format: 'hhmmss'}
+---
+{
+	Header:( 
+	payload...*INVENTORY_STATUS_CHANGE_IFD_SEG map (val,idx) ->
+		{
+		WMITRN : val.TRNNUM as Number,		 
+		WMICST : '',
+		WMICRD : curDate,
+		WMICRT : curTime,
+		WMIMUID: MuleId,
+		WMIFIL : '',
+		WMIWID : if (val.WH_ID == 'CHAPTER1') '555' else '555' as Number,
+		WMIVPN : val.PRTNUM,
+		WMIQTY : val.CHGQTY as Number, 
+		WMIFST : val.FR_INVSTS,
+		WMITST : val.TO_INVSTS,
+		WMIRCD : val.REACOD,
+		WMIERR : ''
+		})				
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Result" doc:id="86c4b525-aa97-48ef-a9f2-1b5435624d36" variableName="Result"/>
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="dd869728-6c90-45fd-b58c-ad15c3d9534d" variableName="Action"/>
+		<set-payload value="#[%dw 2.0 output application/csv
+---
+vars.Result.Header]" doc:name="Set Payload to Header" doc:id="933118a6-17dd-43e0-908b-76525a11d8f8" />
+		<set-variable value="#[%dw 2.0 output application/json
+---
+p('InboundMMSWorkFile.InvStsChg') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '.csv']" doc:name="Out_FileName" doc:id="11b31ef1-f59e-46d1-a5a9-557644b3cb5b" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0 output application/json
+---
+p('InboundMMSWorkFile.InvStsChg') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '.trg']" doc:name="Trg_FileName" doc:id="fb94b430-38ec-49b4-8f09-2ad79c1e9cf7" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Header CSV to Message Store" doc:id="bc60c91d-4882-4212-8c70-871241653aa5" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="f3e6b526-b3e7-49bd-af15-251aa7f08e27" message="#['\n\t stored CSV into message store']"/>
+		<file:write doc:name="Write Header CSV to MMS Adapter Outbound Folder" doc:id="0e0cb768-c144-418f-b792-634484b2edbb" config-ref="MMS_Out_config" path="#[vars.Out_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="022d79e6-8a0d-4955-ac4a-e1f8423ba2e3" message="#['\n\t Written CSV into MMS Outbound Folder']"/>
+		<file:write doc:name="Write trigger file for Header" doc:id="418ceb22-1efd-43f9-b699-8dd8536ece6b" config-ref="MMS_Out_config" path="#[vars.Trg_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="47697ee8-4687-4ad9-830f-1ba1feaaf0db" message="#[vars.Result.Header.WMITRN as String default ' ' ++ 'processed']"/>
+	</sub-flow>
+
+</mule>

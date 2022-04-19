@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-storeinb-test-suite.xml" />
+	<munit:test name="mms-wms-storeinb-test-suite-Outbound_StrInb_ControlTest" doc:id="508b9d87-fba6-4c4e-9a89-588584949308" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_STORE_INB" doc:id="9601400f-6632-402c-bc86-4441b735b57c" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_STORE_INB" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="8105ff0f-9431-4b96-b52a-3c75b1d8e9d1" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="STORE_INB_CrossRefValues" value='#[readUrl("classpath://Outbound/StrInb/STORE_INB_CrossRefValues.json", "application/json")]' />
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read CSV" doc:id="2482d37f-b6cc-44d8-8416-36b28534bb9e" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Read CSV" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="4e523b42-03aa-4d18-803e-1b077cc29490" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/StrInb/STOREINB_OUB_WMS_QUA_WST_20210211141922423090.csv", "application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Store CSV to message store " doc:id="317b4cc7-d015-4b2e-85c4-9f65c665d10a" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="MessageStore-Store-FromMMS-Flow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send To Destinations" doc:id="ae2e9a88-54f7-4702-9e5a-bf958caa3b25" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_StrInb_Control" doc:id="56edce18-3d4b-4653-b06e-10715d3e1cd9" name="Outbound_StrInb_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

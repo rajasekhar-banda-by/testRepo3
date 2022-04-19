@@ -1,0 +1,991 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="Outbound_Transfer_Control" doc:id="6d51bed6-2dc0-4976-8b22-d8b32af0326e" >
+		<logger level="INFO" doc:name="Logger" doc:id="778ac4a5-b7bd-40df-ba26-ea992b64b0ff" message="#['\n\t Transfer Processing Started']"/>
+		<flow-ref doc:name="getCrossRef_ORDER_INB" doc:id="0294d6ad-0001-4467-98af-5d4a3bcd8fb3" name="getCrossRef_ORDER_INB"/>
+		<flow-ref doc:name="Outbound_Transfer_Process" doc:id="c8975f6f-80d8-4843-92c1-78aa5b1504b6" name="Outbound_Transfer_Process"/>
+	</flow>
+	<sub-flow name="Outbound_Transfer_Process" doc:id="da536979-56f5-4206-a5e8-95e8f972ed7c" >
+		<file:read doc:name="Read" doc:id="1fee1df7-54db-4ab5-a3f4-78d89bec244a" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6d154820-0e74-4f61-afa7-9de20d1d5e73" message="#['\n\t Input CSV Read']"/>
+		<set-variable value="#['Received']" doc:name="Action" doc:id="46d06b80-8ff7-4482-a359-dccedc7266ca" variableName="Action"/>
+		<flow-ref doc:name="Store CSV to Message Store" doc:id="9e599425-58db-4df2-a20f-ae1d301b8f04" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="00101da8-f864-47df-99d4-227eba101750" message="#['\n\t Input CSV stored into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="6366c2d9-7ccd-4677-99ed-b7d10bc7ddd0">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+/* var TRF =  (payload orderBy trim($.PCGKEY)[0 to 7] groupBy trim($.PCGKEY)[0 to 7]) pluck $ */
+
+var TRF =  (payload orderBy $.TRFBCH groupBy $.TRFBCH) pluck $
+---
+(TRF map (Hdr,Hdrindex) ->{
+	TRFHDR: {
+		PCGCDE  : Hdr[0].PCGCDE ,
+		PCGNBR : Hdr[0].PCGNBR,
+		PCGKEY : Hdr[0].PCGKEY,
+		TRFBCH  : Hdr[0].TRFBCH ,
+		TRFTYP  : Hdr[0].TRFTYP ,
+		TRFPTY  : Hdr[0].TRFPTY ,
+		TRFFLC  : Hdr[0].TRFFLC ,
+		TRFTLC  : Hdr[0].TRFTLC ,
+		TRFIDT  : Hdr[0].TRFIDT ,
+		TRFBDT 	: Hdr[0].TRFBDT,
+		WATCCD 	: Hdr[0].WATCCD,
+		WATSCO : Hdr[0].WATSCO,
+		WATAD1 : Hdr[0].WATAD1,
+		WATAD2 : Hdr[0].WATAD2,
+		WATAD3 : Hdr[0].WATAD3,
+		WATAD4 : Hdr[0].WATAD4,
+		WATPCD : Hdr[0].WATPCD,
+		WATCTY : Hdr[0].WATCTY,
+		WATTPN : Hdr[0].WATTPN,
+		WATCSN : Hdr[0].WATCSN,
+		WATCFN : Hdr[0].WATCFN,
+		WATCTL : Hdr[0].WATCTL,
+		WATSOT : Hdr[0].WATSOT,
+		WATSVL : Hdr[0].WATSVL,
+		WATCGP : Hdr[0].WATCGP,
+		WATPNP : Hdr[0].WATPNP,
+		WATODN : Hdr[0].WATODN,
+// PEGD-664: Added field TRFSTS 
+		TRFSTS : Hdr[0].TRFSTS,
+// PEGD 2298:
+        WATSTR : Hdr[0].WATSTR,
+        WATTYP : Hdr[0].WATTYP,
+        WATSST : Hdr[0].WATSST,
+//Version 5.8 Changes
+        WATCOM : Hdr[0].WATCOM
+		},
+	TRFDTL: Hdr map (Dtl,Dtlidx) ->{
+		IVNDPN : Dtl.IVNDPN,
+		TRFREQ : Dtl.TRFREQ,
+		TRFALC : Dtl.TRFALC,
+		WATLIN : Dtl.WATLIN,
+		WATPRC : Dtl.WATPRC,
+		TRFSTS : Dtl.TRFSTS,
+		INUMBR : if (trim(Dtl.INUMBR) !='') Dtl.INUMBR as Number else Dtl.INUMBR default 0,
+		CANSKU : if (trim(Dtl.CANSKU) !='') Dtl.CANSKU as Number else Dtl.CANSKU default 0
+		}
+	}
+)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="82f79abe-e0a1-42c1-99a8-5812e656400d" >
+			<when expression="#[sizeOf(payload) != 0]">
+				<flow-ref doc:name="Outbound_Transfer_BatchProcess" doc:id="07e1aef1-f71e-43e9-a15e-cce237e8114c" name="Outbound_Transfer_BatchProcess" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="3d96c832-e489-4fff-a6c8-24660c9ca43d" message="#['\n\t Process Completed: No Payload to process']"/>
+			</otherwise>
+		</choice>
+	
+	</sub-flow>
+	<flow name="Outbound_Transfer_BatchProcess" doc:id="32f5502b-0936-41a1-9462-a09d9a250e32" >
+		<batch:job jobName="mms-wms-transfer_Batch_Job" doc:id="fa85342a-729f-4825-8f5a-ea0e77979497" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="9de27a37-cb45-4078-b73a-537c88ba1059" >
+					<flow-ref doc:name="Outbound_Transfer_genTrfXML" doc:id="6319388e-c7b6-4549-a092-ed0fb59eaf8f" name="Outbound_Transfer_genTrfXML"/>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<logger level="INFO" doc:name="Logger" doc:id="33acb55e-1415-4bcb-a3e3-46ac518c6b27" message="#['\n\t Processing Completed']"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	<sub-flow name="Outbound_Transfer_genTrfXML" doc:id="6e68e5e7-9216-4e60-a087-606c6624feed">
+		<try doc:name="Try" doc:id="8e6c7c86-6d01-4eb6-bab0-8aea0d9ca7e1">
+			<set-variable value="#[payload.TRFHDR]" doc:name="TRFHDR" doc:id="dd2cc300-c16e-4985-af25-35eea8ab813e" variableName="TRFHDR" />
+			<set-payload value="#[payload.TRFDTL]" doc:name="TRFDTL" doc:id="d2d68315-8bd5-4c15-a5c3-a3a2be9e49c1" />
+			<choice doc:name="Choice" doc:id="f0af96ab-fb43-484a-b0ef-a894d39d1e0f">
+				<when expression="#[vars.TRFHDR.PCGCDE == 'D']">
+					<ee:transform doc:name="Transform Message" doc:id="bf4cd974-6dee-4af4-85e3-7b1e53a2ad4f">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/xml  skipNullOn = "everywhere"
+var DftIFD 		= vars.Transfer_CrossRefValues
+var wareHouse 	= vars.TRFHDR.PCGNBR as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+---
+{
+	ORDER_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			ORDER_SEG: {
+				SEGNAM: DftIFD."ORDER_SEG"."SEGNAM"[0],
+				TRNTYP: vars.TRFHDR.PCGCDE ,												
+				CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+				ORDNUM: trim((vars.TRFHDR.PCGKEY)[0 to 7]),
+			
+			}
+		}
+	}
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</when>
+				<when expression="#[vars.TRFHDR.PCGCDE == 'U']">
+					<validation:is-true doc:name="Is true/TrfDtl validation" doc:id="5b7ce997-a1af-450b-83be-8e03fd12f4f8" expression="#[sizeOf(payload) != 0 ]" message="#[vars.Global.MMSInstanceName ++ &quot;_Transfer &quot; ++ trim(vars.TRFHDR.TRFBCH) default ' ' ++ &quot; No records found &quot;]"/>
+					<ee:transform doc:name="generate xml For Cancel TRF details" doc:id="eaf05369-75bb-4f18-a9ad-d718c8d5e333" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml  skipNullOn = "everywhere"
+var DftIFD 		= vars.Transfer_CrossRefValues
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var StrZonPre 	= DftIFD."HOSTMAP"."STRZNPRE" default ''
+var WhsPref 	= DftIFD."HOSTMAP"."DCTODCPRE" default ''
+var wareHouse 	= vars.TRFHDR.TRFFLC as String
+var ToLoc		= vars.TRFHDR.TRFTLC as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+var TrfNum		= trim(vars.TRFHDR.TRFBCH)
+//var Trfpaded	= ('000000000000000' ++ TrfNum)[sizeOf(TrfNum) to (sizeOf(TrfNum) + 14)]
+//var TrukDtl		=  client ++ 'S' ++ Trfpaded
+var ToLocWS		= if (DftIFD."WHSE_ID"."$ToLoc"[0] != null) 'W' else 'S' 
+fun DateConv (date6) = date6 + 20000000
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getWhs(Store) = WhsPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+/* var StrZone = lookup("getStoreZone",{Store:ToLoc}) default '' */
+/* var StrZone = (StrZonPre[0] ++ (lookup("getStoreZone",{Store:ToLoc}) default '') default '')[0 to 9] */
+
+/* PEG-2039 Concatenate WATODN and TRFBCH ----- START*/ 
+var zerosForPadding = '0000000000'
+fun paddTrf(OrdNum) = if (sizeOf(trim(OrdNum)) < 8) zerosForPadding[0 to (8- sizeOf(trim(OrdNum)) - 1)] ++ trim(OrdNum) else OrdNum as String
+fun paddWat(OrdNum) = if (sizeOf(trim(OrdNum)) < 10) (zerosForPadding[0 to (10 - sizeOf(trim(OrdNum)) - 1)] ++ trim(OrdNum)) else OrdNum as String
+/* PEG-2039 Concatenate WATODN and TRFBCH ------- END */
+
+
+// Version 5.5  var getStBt = if (vars.TRFHDR.TRFTYP == '1' or vars.TRFHDR.TRFTYP == '6' or vars.TRFHDR.TRFTYP == '4') getStr(ToLoc) else if (vars.TRFHDR.TRFTYP == '2' or vars.TRFHDR.TRFTYP == '5' or vars.TRFHDR.TRFTYP == '3') getWhs(ToLoc) else null
+var getStBt = if (vars.TRFHDR.TRFTYP == '1' or vars.TRFHDR.TRFTYP == '6' or vars.TRFHDR.TRFTYP == '4') getStr(ToLoc) else if (vars.TRFHDR.TRFTYP == '2' or vars.TRFHDR.TRFTYP == '5' or vars.TRFHDR.TRFTYP == '3') getStr(ToLoc) else null
+/* var CanTrfDet = payload filter (value, idex) -> (value.TRFSTS == 'C') */
+/* var CanTrfDet = payload  distinctBy $.IVNDPN filter (value, idex)  -> (value.TRFSTS == 'C' and (value.CANSKU as String) == value.INUMBR)  */
+var CanTrfDet = payload filter (value, idex)  -> (value.TRFSTS == 'C' and value.CANSKU == value.INUMBR) 
+/* var TrfDta = if ( sizeOf(Res1 == 0 )) payload else Res1 */
+---
+{
+	ORDER_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			ST_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."ST_CUST_SEG"."SEGNAM"[0],
+// Commenting this because as per latest mapping ver 4.7
+//					HOST_EXT_ID: vars.TRFHDR.WATSTR default '',
+//					HOST_EXT_ID: vars.TRFHDR.WATSCO default '',
+// As per version 4.9, populating HOST_EXT_ID with WATORD.WATODN
+// PEGD-2024: MAPPING VER 4.9
+// PEGD-2298		HOST_EXT_ID: vars.TRFHDR.WATODN default '',
+					HOST_EXT_ID: if (vars.TRFHDR.WATSTR != '888') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST != '0') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST == '0') vars.TRFHDR.WATODN else null,
+//					ADRNAM: (if (vars.TRFHDR.WATCFN != null) (vars.TRFHDR.WATCFN ++ vars.Blank) else '') ++ if (vars.TRFHDR.WATSFN != null) vars.TRFHDR.WATSFN else ' ', 
+					ADRNAM: vars.TRFHDR.WATCFN,
+					ADRTYP: DftIFD."ST_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."ST_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL,
+//Version 5.8 Changes
+					EMAIL_ADR: if (vars.TRFHDR.WATTYP == 'I') vars.TRFHDR.WATCOM else null,		
+				} else null,
+				
+				RT_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."RT_CUST_SEG"."SEGNAM"[0],
+// PEGD-2024: MAPPING VER 4.9					
+// As per ver 4.9, changing HOST_EXT_ID to WATORD.WATODN
+//					HOST_EXT_ID: vars.TRFHDR.WATSCO default '',
+					HOST_EXT_ID: vars.TRFHDR.WATODN default '',					
+					ADRNAM: vars.TRFHDR.WATCFN default '',
+					ADRTYP: DftIFD."ST_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."RT_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL	
+				} else null,
+				
+
+				BT_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."BT_CUST_SEG"."SEGNAM"[0],
+// PEGD-2024: MAPPING VER 4.9
+// As per ver 4.9, changing HOST_EXT_ID to WATORD.WATODN
+//					HOST_EXT_ID: vars.TRFHDR.WATSCO default '',
+					HOST_EXT_ID: vars.TRFHDR.WATODN default '',					
+					ADRNAM: vars.TRFHDR.WATCFN default '',
+					ADRTYP: DftIFD."BT_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."BT_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL	
+				} else null,
+				
+			ORDER_SEG: {
+				SEGNAM: DftIFD."ORDER_SEG"."SEGNAM"[0],
+// PEGD-664: Added condition to populate TRNTYP to 'D' when transfer status is 'C' and PCGCDE is 'U'
+                TRNTYP: if (vars.TRFHDR.PCGCDE == 'D') vars.TRFHDR.PCGCDE  else 'R',		/*Always send R(For A/C) */		
+//				TRNTYP: if (vars.TRFHDR.PCGCDE == 'D') vars.TRFHDR.PCGCDE else if (vars.TRFHDR.PCGCDE == 'U' and vars.TRFHDR.TRFSTS == 'C' ) 'D' else 'R',		/*Always send R(For A/C) */												
+				CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+
+// PEGD 2025: 
+//				ORDNUM: vars.TRFHDR.TRFBCH,
+// As per ver 4.8, modifying ORDNUM value to WATORD.WATODN instead of TRFBCH
+
+// PEG-2039 Concatenate WATODN and TRFBCH
+//				ORDNUM: vars.TRFHDR.WATODN,		
+
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//				ORDNUM: vars.TRFHDR.WATODN,
+				ORDNUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+						
+				/*DC to DC transfer type is 3 */
+//				ORDTYP: if (vars.TRFHDR.TRFTYP == '3') 'STDR' else 'STSD',				
+//				ORDTYP: vars.TRFHDR.WATTYP,
+				ORDTYP: vars.TRFHDR.WATSOT,
+//				ENTDTE: DftIFD."ORDER_SEG"."ENTDTE"[0],
+				ENTDTE: DateConv(vars.TRFHDR.TRFIDT), 
+
+			/*	STCUST: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+// PEGD 2298: 	STCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+// PEGD 2298:   STCUST: if (vars.TRFHDR.WATSTR == '555' or vars.TRFHDR.WATSTR == '888') getStBt else if ((vars.TRFHDR.WATTYP == 'ZIFSBBS' or vars.TRFHDR.WATTYP == 'ZIFSBBM') and (vars.TRFHDR.WATSST != 0)) vars.TRFHDR.WATSST else null,
+                STCUST: if (vars.TRFHDR.WATSTR != '888') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST != '0') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST == '0') vars.TRFHDR.WATODN else null,
+//				STCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+                
+				ST_HOST_ADR_ID: DftIFD."ORDER_SEG"."ST_HOST_ADR_ID"[0],
+//				RTCUST: vars.StoreZone,	 
+			/*	RTCUST: 'Z-MOA', */										
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+//				RTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+				RTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,				
+				RT_HOST_ADR_ID: DftIFD."ORDER_SEG"."RT_HOST_ADR_ID"[0],
+
+			/*	BTCUST: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+			//				BTCUST: getStBt,
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+//				BTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+				BTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,				
+				BT_HOST_ADR_ID: DftIFD."ORDER_SEG"."BT_HOST_ADR_ID"[0],
+//				CPONUM: DftIFD."ORDER_SEG"."CPONUM"[0],
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//				CPONUM: vars.TRFHDR.TRFBCH,
+				CPONUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+
+
+//				CPODTE: DftIFD."ORDER_SEG"."CPODTE"[0],
+				CPODTE: DateConv(vars.TRFHDR.TRFIDT), 
+				CPOTYP: DftIFD."ORDER_SEG"."CPOTYP"[0],
+				PAYTRM: DftIFD."ORDER_SEG"."PAYTRM"[0],
+				CARFLG: DftIFD."ORDER_SEG"."CARFLG"[0],
+//				SHIPBY: DftIFD."ORDER_SEG"."SHIPBY"[0],
+//				SHIPBY: vars.TRFHDR.PCGKEY,
+				RRLFLG: DftIFD."ORDER_SEG"."RRLFLG"[0],
+				WAVE_FLG: DftIFD."ORDER_SEG"."WAVE_FLG"[0],
+				REQUIR_TMS_FLG: DftIFD."ORDER_SEG"."REQUIR_TMS_FLG"[0],
+				COD_FLG: DftIFD."ORDER_SEG"."COD_FLG"[0],
+//				ORD_FRTRTE: DftIFD."ORDER_SEG"."ORD_FRTRTE"[0],
+				ORD_FRTRTE: vars.TRFHDR.WATPNP,
+				BCO_FLG: DftIFD."ORDER_SEG"."BCO_FLG"[0],
+				SIG_REQ_FLG: DftIFD."ORDER_SEG"."SIG_REQ_FLG"[0],
+				BILL_FREIGHT_FLG: DftIFD."ORDER_SEG"."BILL_FREIGHT_FLG"[0],
+				COD_PAYMENT_TYPE: DftIFD."ORDER_SEG"."COD_PAYMENT_TYPE"[0],
+				PAYMENT_TYPE: DftIFD."ORDER_SEG"."PAYMENT_TYPE"[0],
+				RMANUM: DftIFD."ORDER_SEG"."RMANUM"[0],
+				BRCUST: DftIFD."ORDER_SEG"."BRCUST"[0],
+				BR_HOST_ADR_ID: DftIFD."ORDER_SEG"."BR_HOST_ADR_ID"[0],
+				COD_IND_TYPE: DftIFD."ORDER_SEG"."COD_IND_TYPE"[0],
+				CUSTOMS_CLR_FLG: DftIFD."ORDER_SEG"."CUSTOMS_CLR_FLG"[0],
+				SRV_TYPE: DftIFD."ORDER_SEG"."SRV_TYPE"[0],
+				CRNCY_CODE: DftIFD."ORDER_SEG"."CRNCY_CODE"[0],
+				BTO_SEQNUM: DftIFD."ORDER_SEG"."BTO_SEQNUM"[0],
+				SLOT: DftIFD."ORDER_SEG"."SLOT"[0],
+				RUSH_FLG: DftIFD."ORDER_SEG"."RUSH_FLG"[0],
+				DEPTNO: DftIFD."ORDER_SEG"."DEPTNO"[0],
+				DEST_NUM: DftIFD."ORDER_SEG"."DEST_NUM"[0],
+				DUTY_PAYMENT_TYPE: DftIFD."ORDER_SEG"."DUTY_PAYMENT_TYPE"[0],
+				DUTY_PAYMENT_ACCT: DftIFD."ORDER_SEG"."DUTY_PAYMENT_ACCT"[0],
+				CSTMS_DTYCUST: DftIFD."ORDER_SEG"."CSTMS_DTYCUST"[0],
+				EXCISE_DTYCUST: DftIFD."ORDER_SEG"."EXCISE_DTYCUST"[0],
+				CSTMS_ORDTYP: DftIFD."ORDER_SEG"."CSTMS_ORDTYP"[0],
+				DFLT_ORDLIN_CHG_REACOD: DftIFD."ORDER_SEG"."DFLT_ORDLIN_CHG_REACOD"[0],
+				PLAN_SLOT_SEQ: DftIFD."ORDER_SEG"."PLAN_SLOT_SEQ"[0],
+				DLVSEQ: DftIFD."ORDER_SEG"."DLVSEQ"[0],
+				DLVNUM: DftIFD."ORDER_SEG"."DLVNUM"[0],
+						
+				/* Write First Box Details at Store Level  */
+				(CanTrfDet map (val,idx) -> {				
+					ORDER_LINE_SEG: {
+						SEGNAM: DftIFD."ORDER_LINE_SEG"."SEGNAM"[0],
+// PEGD 2025: 
+//						ORDNUM: vars.TRFHDR.TRFBCH,
+// As per ver 4.8, modifying ORDNUM value to WATORD.WATODN instead of TRFBCH
+
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//						ORDNUM: vars.TRFHDR.WATODN,													
+						ORDNUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+//						ORDLIN: 10 * (idx + 1),
+						ORDLIN: val.WATLIN,
+						ORDSLN: DftIFD."ORDER_LINE_SEG"."ORDSLN"[0],		/*Pending whether 0 is fine */
+						SALES_ORDNUM: vars.TRFHDR.TRFBCH,
+						SALES_ORDLIN: vars.TRFHDR.TRFFLC,
+//						ENTDTE: DftIFD."ORDER_LINE_SEG"."ENTDTE"[0],
+						ENTDTE: DateConv(vars.TRFHDR.TRFIDT), 
+//						PRTNUM: val.INUMBR,											/*SKU Level */
+						PRTNUM: val.IVNDPN,
+						PRT_CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+						ORGCOD: DftIFD."ORDER_LINE_SEG"."ORGCOD"[0],
+						REVLVL: DftIFD."ORDER_LINE_SEG"."REVLVL"[0],
+						LOTNUM: DftIFD."ORDER_LINE_SEG"."LOTNUM"[0],
+						SUP_LOTNUM: DftIFD."ORDER_LINE_SEG"."SUP_LOTNUM"[0],
+						INVSTS: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS"[0],			/*SKU Level */
+						ORDQTY: val.TRFALC,
+						MARCOD: DftIFD."ORDER_LINE_SEG"."MARCOD"[0],
+						PRCPRI: DftIFD."ORDER_LINE_SEG"."PRCPRI"[0],
+						OVAFLG: DftIFD."ORDER_LINE_SEG"."OVAFLG"[0],
+						OVPFLG: DftIFD."ORDER_LINE_SEG"."OVPFLG"[0],
+						RPQFLG: DftIFD."ORDER_LINE_SEG"."RPQFLG"[0],
+						OVRCOD: DftIFD."ORDER_LINE_SEG"."OVRCOD"[0],
+						OVRAMT: DftIFD."ORDER_LINE_SEG"."OVRAMT"[0],
+						STDFLG: DftIFD."ORDER_LINE_SEG"."STDFLG"[0],
+// PEGD-379, PEGD-204, PEGD-644 -- sending PARFLG as 1 is required for all these PEGs
+						PARFLG: DftIFD."ORDER_LINE_SEG"."PARFLG"[0],
+//						PARFLG: if(vars.TRFHDR.TRFPTY == 'I') '0' else '1',
+						BCKFLG: DftIFD."ORDER_LINE_SEG"."BCKFLG"[0],
+						CARCOD: vars.TRFHDR.WATCCD, 
+				/*		CARCOD: 'Z-MOA',*/
+//						CARGRP: DftIFD."ORDER_LINE_SEG"."CARGRP"[0],
+						CARGRP: vars.TRFHDR.WATCGP,
+//						SRVLVL: DftIFD."ORDER_LINE_SEG"."SRVLVL"[0],
+//						SRVLVL: vars.TRFHDR.WATSPC,
+						SRVLVL: vars.TRFHDR.WATSVL,
+						SDDFLG: DftIFD."ORDER_LINE_SEG"."SDDFLG"[0],
+						FRTCOD: DftIFD."ORDER_LINE_SEG"."FRTCOD"[0],
+						COOINC: DftIFD."ORDER_LINE_SEG"."COOINC"[0],
+						COOLST: DftIFD."ORDER_LINE_SEG"."COOLST"[0],
+						ACCNUM: DftIFD."ORDER_LINE_SEG"."ACCNUM"[0],
+						PRJNUM: DftIFD."ORDER_LINE_SEG"."PRJNUM"[0],
+						CSTPRT: DftIFD."ORDER_LINE_SEG"."CSTPRT"[0],
+						MANFID: DftIFD."ORDER_LINE_SEG"."MANFID"[0],
+						DEPTNO: DftIFD."ORDER_LINE_SEG"."DEPTNO"[0],
+						UNTPAK: DftIFD."ORDER_LINE_SEG"."UNTPAK"[0],
+						UNTPAL: DftIFD."ORDER_LINE_SEG"."UNTPAL"[0],
+						UNTCAS: DftIFD."ORDER_LINE_SEG"."UNTCAS"[0],
+//						EARLY_SHPDTE: DftIFD."ORDER_LINE_SEG"."EARLY_SHPDTE"[0],
+						EARLY_SHPDTE: DateConv(vars.TRFHDR.TRFBDT), 
+						EARLY_DLVDTE: DftIFD."ORDER_LINE_SEG"."EARLY_DLVDTE"[0],
+						LATE_SHPDTE: DftIFD."ORDER_LINE_SEG"."LATE_SHPDTE"[0],
+						LATE_DLVDTE: DftIFD."ORDER_LINE_SEG"."LATE_DLVDTE"[0],
+						SRC_HOST_ADR_ID: DftIFD."ORDER_LINE_SEG"."SRC_HOST_ADR_ID"[0],
+						RSVPRI: DftIFD."ORDER_LINE_SEG"."RSVPRI"[0],
+						RSVQTY: DftIFD."ORDER_LINE_SEG"."RSVQTY"[0],
+						PCKGR1: DftIFD."ORDER_LINE_SEG"."PCKGR1"[0],
+						PCKGR2: DftIFD."ORDER_LINE_SEG"."PCKGR2"[0],
+						PCKGR3: DftIFD."ORDER_LINE_SEG"."PCKGR3"[0],
+						PCKGR4: DftIFD."ORDER_LINE_SEG"."PCKGR4"[0],
+						DST_MOV_ZONE_ID: DftIFD."ORDER_LINE_SEG"."DST_MOV_ZONE_ID"[0],
+						DSTLOC: DftIFD."ORDER_LINE_SEG"."DSTLOC"[0], 
+				/*		DSTLOC: 'Z-MOA',*/							
+						XDKFLG: DftIFD."ORDER_LINE_SEG"."XDKFLG"[0],
+						PRT_DL_TYP: DftIFD."ORDER_LINE_SEG"."PRT_DL_TYP"[0],
+						ATOFLG: DftIFD."ORDER_LINE_SEG"."ATOFLG"[0],
+						HOST_ORDQTY: val.TRFALC,
+						HSTSTS: DftIFD."ORDER_LINE_SEG"."HSTSTS"[0],
+						SPLFLG: DftIFD."ORDER_LINE_SEG"."SPLFLG"[0],
+//						INVSTS_PRG: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS_PRG"[0],
+						INVSTS_PRG: if(vars.TRFHDR.TRFPTY == 'I') 'I' else 'A',
+						FRSFLG: DftIFD."ORDER_LINE_SEG"."FRSFLG"[0],
+						MIN_SHELF_HRS: DftIFD."ORDER_LINE_SEG"."MIN_SHELF_HRS"[0],
+						ORDINV: DftIFD."ORDER_LINE_SEG"."ORDINV"[0],
+						NON_ALC_FLG: DftIFD."ORDER_LINE_SEG"."NON_ALC_FLG"[0],
+//						UNT_PRICE: DftIFD."ORDER_LINE_SEG"."UNT_PRICE"[0],
+						UNT_PRICE: val.WATPRC,
+						WAVE_SET: DftIFD."ORDER_LINE_SEG"."WAVE_SET"[0],
+						CRNCY_NAME: DftIFD."ORDER_LINE_SEG"."CRNCY_NAME"[0],
+						TOT_PLN_MISC_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC_QTY"[0],
+						TOT_PLN_MISC2_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC2_QTY"[0],
+						ALC_SEARCH_PATH: DftIFD."ORDER_LINE_SEG"."ALC_SEARCH_PATH"[0],
+						SUPNUM: DftIFD."ORDER_LINE_SEG"."SUPNUM"[0],
+						CRNCY_CODE: DftIFD."ORDER_LINE_SEG"."CRNCY_CODE"[0],
+						BTO_COMCOD: DftIFD."ORDER_LINE_SEG"."BTO_COMCOD"[0],
+						BTO_DLV_SEQ: DftIFD."ORDER_LINE_SEG"."BTO_DLV_SEQ"[0],
+						BTO_STATION: DftIFD."ORDER_LINE_SEG"."BTO_STATION"[0],
+						BTO_SIDE: DftIFD."ORDER_LINE_SEG"."BTO_SIDE"[0],
+						BTO_BAY: DftIFD."ORDER_LINE_SEG"."BTO_BAY"[0],
+						FTPCOD: DftIFD."ORDER_LINE_SEG"."FTPCOD"[0],
+						ABS_ORDINV_WIN: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_WIN"[0],
+						ABS_ORDINV_CODE: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_CODE"[0],
+						PAYTRM: DftIFD."ORDER_LINE_SEG"."PAYTRM"[0],
+						SED_EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."SED_EXPORT_TYP"[0],
+//						COONUM: val.DPTNAM replace "'" with(" "),
+						COONUM: DftIFD."ORDER_LINE_SEG"."COONUM"[0],
+						COOTYP: DftIFD."ORDER_LINE_SEG"."COOTYP"[0],
+						ECCN: DftIFD."ORDER_LINE_SEG"."ECCN"[0],
+						EXPLICEXCPT: DftIFD."ORDER_LINE_SEG"."EXPLICEXCPT"[0],
+						EXPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."EXPLICEXPDTE"[0],
+						EXPLICNUM: DftIFD."ORDER_LINE_SEG"."EXPLICNUM"[0],
+						IMPLICEXCPT: DftIFD."ORDER_LINE_SEG"."IMPLICEXCPT"[0],
+						IMPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."IMPLICEXPDTE"[0],
+						IMPLICNUM: DftIFD."ORDER_LINE_SEG"."IMPLICNUM"[0],
+						MARKSNUMBERS: DftIFD."ORDER_LINE_SEG"."MARKSNUMBERS"[0],
+						NAFTABEGDTE: DftIFD."ORDER_LINE_SEG"."NAFTABEGDTE"[0],
+						NAFTAENDDTE: DftIFD."ORDER_LINE_SEG"."NAFTAENDDTE"[0],
+						NAFTA_PREF_CRIT: DftIFD."ORDER_LINE_SEG"."NAFTA_PREF_CRIT"[0],
+						NAFTA_PRODUCER: DftIFD."ORDER_LINE_SEG"."NAFTA_PRODUCER"[0],
+						SEDFLG: DftIFD."ORDER_LINE_SEG"."SEDFLG"[0],
+						TRADEAGREETYP: DftIFD."ORDER_LINE_SEG"."TRADEAGREETYP"[0],
+						EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."EXPORT_TYP"[0],
+						RULE_NAM: DftIFD."ORDER_LINE_SEG"."RULE_NAM"[0],
+						MANDTE: DftIFD."ORDER_LINE_SEG"."MANDTE"[0],
+						EXPIRE_DTE: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE"[0],
+						MANDTE_FMT: DftIFD."ORDER_LINE_SEG"."MANDTE_FMT"[0],
+						MANDTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."MANDTE_FMTVAL"[0],
+						EXPIRE_DTE_FMT: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMT"[0],
+						EXPIRE_DTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMTVAL"[0],
+						DISTRO_ID: DftIFD."ORDER_LINE_SEG"."DISTRO_ID"[0],
+						SOURCE_WH: DftIFD."ORDER_LINE_SEG"."SOURCE_WH"[0],
+						SOURCE_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_DISTRO_ID"[0],
+						SOURCE_WH_HOST_EXT_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_WH_HOST_EXT_ID"[0],
+						PROMO_COD: DftIFD."ORDER_LINE_SEG"."PROMO_COD"[0],
+						INVNUM: DftIFD."ORDER_LINE_SEG"."INVNUM"[0],
+						SUPNUM_DISTRO: DftIFD."ORDER_LINE_SEG"."SUPNUM_DISTRO"[0],
+						TRKNUM: DftIFD."ORDER_LINE_SEG"."TRKNUM"[0],
+						INVLIN: DftIFD."ORDER_LINE_SEG"."INVLIN"[0],
+						INVSLN: DftIFD."ORDER_LINE_SEG"."INVSLN"[0],
+						STO_ALC_FLG: DftIFD."ORDER_LINE_SEG"."STO_ALC_FLG"[0],
+						ORG_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."ORG_DISTRO_ID"[0],
+						INV_ATTR_STR1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR1"[0],
+						INV_ATTR_STR2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR2"[0],
+						INV_ATTR_STR3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR3"[0],
+						INV_ATTR_STR4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR4"[0],
+						INV_ATTR_STR5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR5"[0],
+						INV_ATTR_STR6: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR6"[0],
+						INV_ATTR_STR7: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR7"[0],
+						INV_ATTR_STR8: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR8"[0],
+						INV_ATTR_STR9: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR9"[0],
+						INV_ATTR_STR10: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR10"[0],
+						INV_ATTR_STR11: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR11"[0],
+						INV_ATTR_STR12: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR12"[0],
+						INV_ATTR_STR13: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR13"[0],
+						INV_ATTR_STR14: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR14"[0],
+				/*		INV_ATTR_STR15: vars.StoreZone, */
+				/*		INV_ATTR_STR15: 'Z-MOA',   */  
+				/*		INV_ATTR_STR16: val.INUMBR, */
+				/*		INV_ATTR_STR17: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+						INV_ATTR_STR15: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR15"[0],
+						INV_ATTR_STR16: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR16"[0],
+						INV_ATTR_STR17: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR17"[0],
+						INV_ATTR_STR18: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR18"[0],
+						INV_ATTR_INT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT1"[0],
+						INV_ATTR_INT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT2"[0],
+						INV_ATTR_INT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT3"[0],
+						INV_ATTR_INT4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT4"[0],
+						INV_ATTR_INT5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT5"[0],
+						INV_ATTR_FLT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT1"[0],
+						INV_ATTR_FLT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT2"[0],
+						INV_ATTR_FLT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT3"[0],
+						INV_ATTR_DTE1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1"[0],
+						INV_ATTR_DTE1_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMT"[0],
+						INV_ATTR_DTE1_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMTVAL"[0],
+						INV_ATTR_DTE2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2"[0],
+						INV_ATTR_DTE2_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMT"[0],
+						INV_ATTR_DTE2_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMTVAL"[0],
+						ALLOW_OVRSHPFLG: DftIFD."ORDER_LINE_SEG"."ALLOW_OVRSHPFLG"[0],
+						DISTRO_TYP: DftIFD."ORDER_LINE_SEG"."DISTRO_TYP"[0],
+						ORDLIN_CHG_REACOD: DftIFD."ORDER_LINE_SEG"."ORDLIN_CHG_REACOD"[0],
+						REACOD_CMNT: DftIFD."ORDER_LINE_SEG"."REACOD_CMNT"[0],
+						ASSET_TYP: DftIFD."ORDER_LINE_SEG"."ASSET_TYP"[0],
+						LOAD_ATTR1_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR1_CFG"[0],
+						LOAD_ATTR2_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR2_CFG"[0],
+						LOAD_ATTR3_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR3_CFG"[0],
+						LOAD_ATTR4_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR4_CFG"[0],
+						LOAD_ATTR5_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR5_CFG"[0],
+// 						CANCELLED_FLG: DftIFD."ORDER_LINE_SEG"."CANCELLED_FLG"[0],
+// PEGD 2298:			CANCELLED_FLG: val.TRFSTS,
+                        CANCELLED_FLG: 0,
+						TOT_PLN_CUBE: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CUBE"[0],
+						TOT_PLN_WGT: DftIFD."ORDER_LINE_SEG"."TOT_PLN_WGT"[0],
+						TOT_PLN_CAS_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CAS_QTY"[0],
+						TOT_PLN_PAL_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_PAL_QTY"[0],
+						BLK_SLOT_ONLY_FLG: DftIFD."ORDER_LINE_SEG"."BLK_SLOT_ONLY_FLG"[0]
+					}
+				}),
+			
+			}
+		}
+	}
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</when>
+				<otherwise>
+					<validation:is-true doc:id="77c55dcb-e0d5-40b7-ab56-4a7ff4a214f3" expression="#[sizeOf(payload) != 0 ]" message="#[vars.Global.MMSInstanceName ++ &quot;_Transfer &quot; ++ trim(vars.TRFHDR.TRFBCH) default ' ' ++ &quot; No records found &quot;]" doc:name="Is true/TrfDtl validation" />
+					<ee:transform doc:name="generate xml" doc:id="3e6d95c9-840d-47a2-9295-dd438f69d869">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml  skipNullOn = "everywhere"
+var DftIFD 		= vars.Transfer_CrossRefValues
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var StrZonPre 	= DftIFD."HOSTMAP"."STRZNPRE" default ''
+var WhsPref 	= DftIFD."HOSTMAP"."DCTODCPRE" default ''
+var wareHouse 	= vars.TRFHDR.TRFFLC as String
+var ToLoc		= vars.TRFHDR.TRFTLC as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+var TrfNum		= trim(vars.TRFHDR.TRFBCH)
+//var Trfpaded	= ('000000000000000' ++ TrfNum)[sizeOf(TrfNum) to (sizeOf(TrfNum) + 14)]
+//var TrukDtl		=  client ++ 'S' ++ Trfpaded
+var ToLocWS		= if (DftIFD."WHSE_ID"."$ToLoc"[0] != null) 'W' else 'S' 
+fun DateConv (date6) = date6 + 20000000
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getWhs(Store) = WhsPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+/* var StrZone = lookup("getStoreZone",{Store:ToLoc}) default '' */
+/* var StrZone = (StrZonPre[0] ++ (lookup("getStoreZone",{Store:ToLoc}) default '') default '')[0 to 9] */
+
+/* PEG-2039 Concatenate WATODN and TRFBCH ----- START*/ 
+var zerosForPadding = '0000000000'
+fun paddTrf(OrdNum) = if (sizeOf(trim(OrdNum)) < 8) zerosForPadding[0 to (8- sizeOf(trim(OrdNum)) - 1)] ++ trim(OrdNum) else OrdNum as String
+fun paddWat(OrdNum) = if (sizeOf(trim(OrdNum)) < 10) (zerosForPadding[0 to (10 - sizeOf(trim(OrdNum)) - 1)] ++ trim(OrdNum)) else OrdNum as String
+/* PEG-2039 Concatenate WATODN and TRFBCH ------- END */
+
+
+//Version 5.5 var getStBt = if (vars.TRFHDR.TRFTYP == '1' or vars.TRFHDR.TRFTYP == '6' or vars.TRFHDR.TRFTYP == '4') getStr(ToLoc) else if (vars.TRFHDR.TRFTYP == '2' or vars.TRFHDR.TRFTYP == '5' or vars.TRFHDR.TRFTYP == '3') getWhs(ToLoc) else null
+var getStBt = if (vars.TRFHDR.TRFTYP == '1' or vars.TRFHDR.TRFTYP == '6' or vars.TRFHDR.TRFTYP == '4') getStr(ToLoc) else if (vars.TRFHDR.TRFTYP == '2' or vars.TRFHDR.TRFTYP == '5' or vars.TRFHDR.TRFTYP == '3') getStr(ToLoc) else null
+/* var Res1 = payload filter (value, idex) -> (value.TRFSTS == 'C') */
+/* var TrfDta = if ( sizeOf(Res1 == 0 )) payload else Res1 */
+---
+{
+	ORDER_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			ST_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."ST_CUST_SEG"."SEGNAM"[0],
+// Commenting this because as per latest mapping ver 4.7
+//					HOST_EXT_ID: vars.TRFHDR.WATSTR default '',
+//					HOST_EXT_ID: vars.TRFHDR.WATSCO default '',
+// As per version 4.9, populating HOST_EXT_ID with WATORD.WATODN
+// PEGD-2024: MAPPING VER 4.9
+// PEGD-2298		HOST_EXT_ID: vars.TRFHDR.WATODN default '',
+                    HOST_EXT_ID: if (vars.TRFHDR.WATSTR != '888') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST != '0') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST == '0') vars.TRFHDR.WATODN else null,
+					
+//					ADRNAM: (if (vars.TRFHDR.WATCFN != null) (vars.TRFHDR.WATCFN ++ vars.Blank) else '') ++ if (vars.TRFHDR.WATSFN != null) vars.TRFHDR.WATSFN else ' ', 
+					ADRNAM: vars.TRFHDR.WATCFN,
+					ADRTYP: DftIFD."ST_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."ST_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL,
+//Version 5.8 Changes
+					EMAIL_ADR: if (vars.TRFHDR.WATTYP == 'I') vars.TRFHDR.WATCOM else null,	
+				} else null,
+				
+				RT_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."RT_CUST_SEG"."SEGNAM"[0],
+// PEGD-2024: MAPPING VER 4.9					
+// As per ver 4.9, changing HOST_EXT_ID to WATORD.WATODN
+//					HOST_EXT_ID: vars.TRFHDR.WATSCO default '',
+					HOST_EXT_ID: vars.TRFHDR.WATODN default '',					
+					ADRNAM: vars.TRFHDR.WATCFN default '',
+					ADRTYP: DftIFD."ST_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."RT_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL	
+				} else null,
+				
+
+				BT_CUST_SEG: if (vars.TRFHDR.TRFPTY == 'I') {
+					SEGNAM: DftIFD."BT_CUST_SEG"."SEGNAM"[0],
+// PEGD-2024: MAPPING VER 4.9
+// As per ver 4.9, changing HOST_EXT_ID to WATORD.WATODN
+//          		HOST_EXT_ID: vars.TRFHDR.WATSCO default '',                    
+					HOST_EXT_ID: vars.TRFHDR.WATODN default '',					
+					ADRNAM: vars.TRFHDR.WATCFN default '',
+					ADRTYP: DftIFD."BT_CUST_SEG"."ADRTYP"[0],
+					ADRLN1: vars.TRFHDR.WATAD1,
+					ADRLN2: vars.TRFHDR.WATAD2,					
+					ADRLN3: vars.TRFHDR.WATAD3,					
+					ADRLN4: vars.TRFHDR.WATAD4,
+					ADRPSZ: vars.TRFHDR.WATPCD,
+					CTRY_NAME: vars.TRFHDR.WATCTY,
+					PHNNUM: vars.TRFHDR.WATTPN,
+					TEMP_FLG: DftIFD."BT_CUST_SEG"."TEMP_FLG"[0],
+					LAST_NAME: vars.TRFHDR.WATCSN,
+					FIRST_NAME: vars.TRFHDR.WATCFN,
+					HONORIFIC: vars.TRFHDR.WATCTL	
+				} else null,
+				
+			ORDER_SEG: {
+				SEGNAM: DftIFD."ORDER_SEG"."SEGNAM"[0],
+// PEGD-664: Added condition to populate TRNTYP to 'D' when transfer status is 'C' and PCGCDE is 'U'
+                TRNTYP: if (vars.TRFHDR.PCGCDE == 'D') vars.TRFHDR.PCGCDE  else 'R',		/*Always send R(For A/C) */		
+//				TRNTYP: if (vars.TRFHDR.PCGCDE == 'D') vars.TRFHDR.PCGCDE else if (vars.TRFHDR.PCGCDE == 'U' and vars.TRFHDR.TRFSTS == 'C' ) 'D' else 'R',		/*Always send R(For A/C) */												
+				CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+
+// PEGD 2025: 
+//				ORDNUM: vars.TRFHDR.TRFBCH,
+// As per ver 4.8, modifying ORDNUM value to WATORD.WATODN instead of TRFBCH
+
+// PEG-2039 Concatenate WATODN and TRFBCH
+//				ORDNUM: vars.TRFHDR.WATODN,		
+
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//				ORDNUM: vars.TRFHDR.WATODN,
+				ORDNUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+						
+				/*DC to DC transfer type is 3 */
+//				ORDTYP: if (vars.TRFHDR.TRFTYP == '3') 'STDR' else 'STSD',				
+//				ORDTYP: vars.TRFHDR.WATTYP,
+				ORDTYP: vars.TRFHDR.WATSOT,
+//				ENTDTE: DftIFD."ORDER_SEG"."ENTDTE"[0],
+				ENTDTE: DateConv(vars.TRFHDR.TRFIDT), 
+
+			/*	STCUST: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+//				STCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+// PEGD 2025:	STCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,
+// PEGD 2298:   STCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,
+// PEGD 2298:   STCUST: if (vars.TRFHDR.WATSTR == '555' or vars.TRFHDR.WATSTR == '888') getStBt else if ((vars.TRFHDR.WATTYP == 'ZIFSBBS' or vars.TRFHDR.WATTYP == 'ZIFSBBM') and (vars.TRFHDR.WATSST != 0)) vars.TRFHDR.WATSST else null,
+                STCUST: if (vars.TRFHDR.WATSTR != '888') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST != '0') getStBt else if (vars.TRFHDR.WATSTR == '888' and vars.TRFHDR.WATSST == '0') vars.TRFHDR.WATODN else null,
+				ST_HOST_ADR_ID: DftIFD."ORDER_SEG"."ST_HOST_ADR_ID"[0],
+//				RTCUST: vars.StoreZone,	 
+			/*	RTCUST: 'Z-MOA', */										
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+//				RTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+				RTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,				
+				RT_HOST_ADR_ID: DftIFD."ORDER_SEG"."RT_HOST_ADR_ID"[0],
+
+			/*	BTCUST: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+			//				BTCUST: getStBt,
+// PEGD 2025: 
+// as per ver 4.8, value of host_ext_id has been changed to WATODN. hence changing here as well.
+//				BTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATSCO else getStBt,
+				BTCUST: if (vars.TRFHDR.TRFPTY == 'I') vars.TRFHDR.WATODN else getStBt,				
+				BT_HOST_ADR_ID: DftIFD."ORDER_SEG"."BT_HOST_ADR_ID"[0],
+//				CPONUM: DftIFD."ORDER_SEG"."CPONUM"[0],
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//				CPONUM: vars.TRFHDR.TRFBCH,
+				CPONUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+
+
+//				CPODTE: DftIFD."ORDER_SEG"."CPODTE"[0],
+				CPODTE: DateConv(vars.TRFHDR.TRFIDT), 
+				CPOTYP: DftIFD."ORDER_SEG"."CPOTYP"[0],
+				PAYTRM: DftIFD."ORDER_SEG"."PAYTRM"[0],
+				CARFLG: DftIFD."ORDER_SEG"."CARFLG"[0],
+//				SHIPBY: DftIFD."ORDER_SEG"."SHIPBY"[0],
+//				SHIPBY: vars.TRFHDR.PCGKEY,
+				RRLFLG: DftIFD."ORDER_SEG"."RRLFLG"[0],
+				WAVE_FLG: DftIFD."ORDER_SEG"."WAVE_FLG"[0],
+				REQUIR_TMS_FLG: DftIFD."ORDER_SEG"."REQUIR_TMS_FLG"[0],
+				COD_FLG: DftIFD."ORDER_SEG"."COD_FLG"[0],
+//				ORD_FRTRTE: DftIFD."ORDER_SEG"."ORD_FRTRTE"[0],
+				ORD_FRTRTE: vars.TRFHDR.WATPNP,
+				BCO_FLG: DftIFD."ORDER_SEG"."BCO_FLG"[0],
+				SIG_REQ_FLG: DftIFD."ORDER_SEG"."SIG_REQ_FLG"[0],
+				BILL_FREIGHT_FLG: DftIFD."ORDER_SEG"."BILL_FREIGHT_FLG"[0],
+				COD_PAYMENT_TYPE: DftIFD."ORDER_SEG"."COD_PAYMENT_TYPE"[0],
+				PAYMENT_TYPE: DftIFD."ORDER_SEG"."PAYMENT_TYPE"[0],
+				RMANUM: DftIFD."ORDER_SEG"."RMANUM"[0],
+				BRCUST: DftIFD."ORDER_SEG"."BRCUST"[0],
+				BR_HOST_ADR_ID: DftIFD."ORDER_SEG"."BR_HOST_ADR_ID"[0],
+				COD_IND_TYPE: DftIFD."ORDER_SEG"."COD_IND_TYPE"[0],
+				CUSTOMS_CLR_FLG: DftIFD."ORDER_SEG"."CUSTOMS_CLR_FLG"[0],
+				SRV_TYPE: DftIFD."ORDER_SEG"."SRV_TYPE"[0],
+				CRNCY_CODE: DftIFD."ORDER_SEG"."CRNCY_CODE"[0],
+				BTO_SEQNUM: DftIFD."ORDER_SEG"."BTO_SEQNUM"[0],
+				SLOT: DftIFD."ORDER_SEG"."SLOT"[0],
+				RUSH_FLG: DftIFD."ORDER_SEG"."RUSH_FLG"[0],
+				DEPTNO: DftIFD."ORDER_SEG"."DEPTNO"[0],
+				DEST_NUM: DftIFD."ORDER_SEG"."DEST_NUM"[0],
+				DUTY_PAYMENT_TYPE: DftIFD."ORDER_SEG"."DUTY_PAYMENT_TYPE"[0],
+				DUTY_PAYMENT_ACCT: DftIFD."ORDER_SEG"."DUTY_PAYMENT_ACCT"[0],
+				CSTMS_DTYCUST: DftIFD."ORDER_SEG"."CSTMS_DTYCUST"[0],
+				EXCISE_DTYCUST: DftIFD."ORDER_SEG"."EXCISE_DTYCUST"[0],
+				CSTMS_ORDTYP: DftIFD."ORDER_SEG"."CSTMS_ORDTYP"[0],
+				DFLT_ORDLIN_CHG_REACOD: DftIFD."ORDER_SEG"."DFLT_ORDLIN_CHG_REACOD"[0],
+				PLAN_SLOT_SEQ: DftIFD."ORDER_SEG"."PLAN_SLOT_SEQ"[0],
+				DLVSEQ: DftIFD."ORDER_SEG"."DLVSEQ"[0],
+				DLVNUM: DftIFD."ORDER_SEG"."DLVNUM"[0],
+						
+				/* Write First Box Details at Store Level  */
+				(payload map (val,idx) -> {				
+					ORDER_LINE_SEG: {
+						SEGNAM: DftIFD."ORDER_LINE_SEG"."SEGNAM"[0],
+// PEGD 2025: 
+//						ORDNUM: vars.TRFHDR.TRFBCH,
+// As per ver 4.8, modifying ORDNUM value to WATORD.WATODN instead of TRFBCH
+
+/* PEG-2039 Concatenate WATODN and TRFBCH */
+//						ORDNUM: vars.TRFHDR.WATODN,													
+						ORDNUM: paddWat(vars.TRFHDR.WATODN) ++ paddTrf(vars.TRFHDR.TRFBCH),
+//						ORDLIN: 10 * (idx + 1),
+						ORDLIN: val.WATLIN,
+						ORDSLN: DftIFD."ORDER_LINE_SEG"."ORDSLN"[0],		/*Pending whether 0 is fine */
+						SALES_ORDNUM: vars.TRFHDR.TRFBCH,
+						SALES_ORDLIN: vars.TRFHDR.TRFFLC,
+//						ENTDTE: DftIFD."ORDER_LINE_SEG"."ENTDTE"[0],
+						ENTDTE: DateConv(vars.TRFHDR.TRFIDT), 
+//						PRTNUM: val.INUMBR,											/*SKU Level */
+						PRTNUM: val.IVNDPN,
+						PRT_CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+						ORGCOD: DftIFD."ORDER_LINE_SEG"."ORGCOD"[0],
+						REVLVL: DftIFD."ORDER_LINE_SEG"."REVLVL"[0],
+						LOTNUM: DftIFD."ORDER_LINE_SEG"."LOTNUM"[0],
+						SUP_LOTNUM: DftIFD."ORDER_LINE_SEG"."SUP_LOTNUM"[0],
+						INVSTS: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS"[0],			/*SKU Level */
+						ORDQTY: val.TRFALC,
+						MARCOD: DftIFD."ORDER_LINE_SEG"."MARCOD"[0],
+						PRCPRI: DftIFD."ORDER_LINE_SEG"."PRCPRI"[0],
+						OVAFLG: DftIFD."ORDER_LINE_SEG"."OVAFLG"[0],
+						OVPFLG: DftIFD."ORDER_LINE_SEG"."OVPFLG"[0],
+						RPQFLG: DftIFD."ORDER_LINE_SEG"."RPQFLG"[0],
+						OVRCOD: DftIFD."ORDER_LINE_SEG"."OVRCOD"[0],
+						OVRAMT: DftIFD."ORDER_LINE_SEG"."OVRAMT"[0],
+						STDFLG: DftIFD."ORDER_LINE_SEG"."STDFLG"[0],
+// PEGD-379, PEGD-204, PEGD-644 -- sending PARFLG as 1 is required for all these PEGs
+						PARFLG: DftIFD."ORDER_LINE_SEG"."PARFLG"[0],
+//						PARFLG: if(vars.TRFHDR.TRFPTY == 'I') '0' else '1',
+						BCKFLG: DftIFD."ORDER_LINE_SEG"."BCKFLG"[0],
+						CARCOD: vars.TRFHDR.WATCCD, 
+				/*		CARCOD: 'Z-MOA',*/
+//						CARGRP: DftIFD."ORDER_LINE_SEG"."CARGRP"[0],
+						CARGRP: vars.TRFHDR.WATCGP,
+//						SRVLVL: DftIFD."ORDER_LINE_SEG"."SRVLVL"[0],
+//						SRVLVL: vars.TRFHDR.WATSPC,
+						SRVLVL: vars.TRFHDR.WATSVL,
+						SDDFLG: DftIFD."ORDER_LINE_SEG"."SDDFLG"[0],
+						FRTCOD: DftIFD."ORDER_LINE_SEG"."FRTCOD"[0],
+						COOINC: DftIFD."ORDER_LINE_SEG"."COOINC"[0],
+						COOLST: DftIFD."ORDER_LINE_SEG"."COOLST"[0],
+						ACCNUM: DftIFD."ORDER_LINE_SEG"."ACCNUM"[0],
+						PRJNUM: DftIFD."ORDER_LINE_SEG"."PRJNUM"[0],
+						CSTPRT: DftIFD."ORDER_LINE_SEG"."CSTPRT"[0],
+						MANFID: DftIFD."ORDER_LINE_SEG"."MANFID"[0],
+						DEPTNO: DftIFD."ORDER_LINE_SEG"."DEPTNO"[0],
+						UNTPAK: DftIFD."ORDER_LINE_SEG"."UNTPAK"[0],
+						UNTPAL: DftIFD."ORDER_LINE_SEG"."UNTPAL"[0],
+						UNTCAS: DftIFD."ORDER_LINE_SEG"."UNTCAS"[0],
+//						EARLY_SHPDTE: DftIFD."ORDER_LINE_SEG"."EARLY_SHPDTE"[0],
+						EARLY_SHPDTE: DateConv(vars.TRFHDR.TRFBDT), 
+						EARLY_DLVDTE: DftIFD."ORDER_LINE_SEG"."EARLY_DLVDTE"[0],
+						LATE_SHPDTE: DftIFD."ORDER_LINE_SEG"."LATE_SHPDTE"[0],
+						LATE_DLVDTE: DftIFD."ORDER_LINE_SEG"."LATE_DLVDTE"[0],
+						SRC_HOST_ADR_ID: DftIFD."ORDER_LINE_SEG"."SRC_HOST_ADR_ID"[0],
+						RSVPRI: DftIFD."ORDER_LINE_SEG"."RSVPRI"[0],
+						RSVQTY: DftIFD."ORDER_LINE_SEG"."RSVQTY"[0],
+						PCKGR1: DftIFD."ORDER_LINE_SEG"."PCKGR1"[0],
+						PCKGR2: DftIFD."ORDER_LINE_SEG"."PCKGR2"[0],
+						PCKGR3: DftIFD."ORDER_LINE_SEG"."PCKGR3"[0],
+						PCKGR4: DftIFD."ORDER_LINE_SEG"."PCKGR4"[0],
+						DST_MOV_ZONE_ID: DftIFD."ORDER_LINE_SEG"."DST_MOV_ZONE_ID"[0],
+						DSTLOC: DftIFD."ORDER_LINE_SEG"."DSTLOC"[0], 
+				/*		DSTLOC: 'Z-MOA',*/							
+						XDKFLG: DftIFD."ORDER_LINE_SEG"."XDKFLG"[0],
+						PRT_DL_TYP: DftIFD."ORDER_LINE_SEG"."PRT_DL_TYP"[0],
+						ATOFLG: DftIFD."ORDER_LINE_SEG"."ATOFLG"[0],
+						HOST_ORDQTY: val.TRFALC,
+						HSTSTS: DftIFD."ORDER_LINE_SEG"."HSTSTS"[0],
+						SPLFLG: DftIFD."ORDER_LINE_SEG"."SPLFLG"[0],
+//						INVSTS_PRG: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS_PRG"[0],
+						INVSTS_PRG: if(vars.TRFHDR.TRFPTY == 'I') 'I' else 'A',
+						FRSFLG: DftIFD."ORDER_LINE_SEG"."FRSFLG"[0],
+						MIN_SHELF_HRS: DftIFD."ORDER_LINE_SEG"."MIN_SHELF_HRS"[0],
+						ORDINV: DftIFD."ORDER_LINE_SEG"."ORDINV"[0],
+						NON_ALC_FLG: DftIFD."ORDER_LINE_SEG"."NON_ALC_FLG"[0],
+//						UNT_PRICE: DftIFD."ORDER_LINE_SEG"."UNT_PRICE"[0],
+						UNT_PRICE: val.WATPRC,
+						WAVE_SET: DftIFD."ORDER_LINE_SEG"."WAVE_SET"[0],
+						CRNCY_NAME: DftIFD."ORDER_LINE_SEG"."CRNCY_NAME"[0],
+						TOT_PLN_MISC_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC_QTY"[0],
+						TOT_PLN_MISC2_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC2_QTY"[0],
+						ALC_SEARCH_PATH: DftIFD."ORDER_LINE_SEG"."ALC_SEARCH_PATH"[0],
+						SUPNUM: DftIFD."ORDER_LINE_SEG"."SUPNUM"[0],
+						CRNCY_CODE: DftIFD."ORDER_LINE_SEG"."CRNCY_CODE"[0],
+						BTO_COMCOD: DftIFD."ORDER_LINE_SEG"."BTO_COMCOD"[0],
+						BTO_DLV_SEQ: DftIFD."ORDER_LINE_SEG"."BTO_DLV_SEQ"[0],
+						BTO_STATION: DftIFD."ORDER_LINE_SEG"."BTO_STATION"[0],
+						BTO_SIDE: DftIFD."ORDER_LINE_SEG"."BTO_SIDE"[0],
+						BTO_BAY: DftIFD."ORDER_LINE_SEG"."BTO_BAY"[0],
+						FTPCOD: DftIFD."ORDER_LINE_SEG"."FTPCOD"[0],
+						ABS_ORDINV_WIN: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_WIN"[0],
+						ABS_ORDINV_CODE: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_CODE"[0],
+						PAYTRM: DftIFD."ORDER_LINE_SEG"."PAYTRM"[0],
+						SED_EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."SED_EXPORT_TYP"[0],
+//						COONUM: val.DPTNAM replace "'" with(" "),
+						COONUM: DftIFD."ORDER_LINE_SEG"."COONUM"[0],
+						COOTYP: DftIFD."ORDER_LINE_SEG"."COOTYP"[0],
+						ECCN: DftIFD."ORDER_LINE_SEG"."ECCN"[0],
+						EXPLICEXCPT: DftIFD."ORDER_LINE_SEG"."EXPLICEXCPT"[0],
+						EXPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."EXPLICEXPDTE"[0],
+						EXPLICNUM: DftIFD."ORDER_LINE_SEG"."EXPLICNUM"[0],
+						IMPLICEXCPT: DftIFD."ORDER_LINE_SEG"."IMPLICEXCPT"[0],
+						IMPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."IMPLICEXPDTE"[0],
+						IMPLICNUM: DftIFD."ORDER_LINE_SEG"."IMPLICNUM"[0],
+						MARKSNUMBERS: DftIFD."ORDER_LINE_SEG"."MARKSNUMBERS"[0],
+						NAFTABEGDTE: DftIFD."ORDER_LINE_SEG"."NAFTABEGDTE"[0],
+						NAFTAENDDTE: DftIFD."ORDER_LINE_SEG"."NAFTAENDDTE"[0],
+						NAFTA_PREF_CRIT: DftIFD."ORDER_LINE_SEG"."NAFTA_PREF_CRIT"[0],
+						NAFTA_PRODUCER: DftIFD."ORDER_LINE_SEG"."NAFTA_PRODUCER"[0],
+						SEDFLG: DftIFD."ORDER_LINE_SEG"."SEDFLG"[0],
+						TRADEAGREETYP: DftIFD."ORDER_LINE_SEG"."TRADEAGREETYP"[0],
+						EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."EXPORT_TYP"[0],
+						RULE_NAM: DftIFD."ORDER_LINE_SEG"."RULE_NAM"[0],
+						MANDTE: DftIFD."ORDER_LINE_SEG"."MANDTE"[0],
+						EXPIRE_DTE: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE"[0],
+						MANDTE_FMT: DftIFD."ORDER_LINE_SEG"."MANDTE_FMT"[0],
+						MANDTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."MANDTE_FMTVAL"[0],
+						EXPIRE_DTE_FMT: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMT"[0],
+						EXPIRE_DTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMTVAL"[0],
+						DISTRO_ID: DftIFD."ORDER_LINE_SEG"."DISTRO_ID"[0],
+						SOURCE_WH: DftIFD."ORDER_LINE_SEG"."SOURCE_WH"[0],
+						SOURCE_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_DISTRO_ID"[0],
+						SOURCE_WH_HOST_EXT_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_WH_HOST_EXT_ID"[0],
+						PROMO_COD: DftIFD."ORDER_LINE_SEG"."PROMO_COD"[0],
+						INVNUM: DftIFD."ORDER_LINE_SEG"."INVNUM"[0],
+						SUPNUM_DISTRO: DftIFD."ORDER_LINE_SEG"."SUPNUM_DISTRO"[0],
+						TRKNUM: DftIFD."ORDER_LINE_SEG"."TRKNUM"[0],
+						INVLIN: DftIFD."ORDER_LINE_SEG"."INVLIN"[0],
+						INVSLN: DftIFD."ORDER_LINE_SEG"."INVSLN"[0],
+						STO_ALC_FLG: DftIFD."ORDER_LINE_SEG"."STO_ALC_FLG"[0],
+						ORG_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."ORG_DISTRO_ID"[0],
+						INV_ATTR_STR1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR1"[0],
+						INV_ATTR_STR2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR2"[0],
+						INV_ATTR_STR3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR3"[0],
+						INV_ATTR_STR4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR4"[0],
+						INV_ATTR_STR5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR5"[0],
+						INV_ATTR_STR6: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR6"[0],
+						INV_ATTR_STR7: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR7"[0],
+						INV_ATTR_STR8: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR8"[0],
+						INV_ATTR_STR9: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR9"[0],
+						INV_ATTR_STR10: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR10"[0],
+						INV_ATTR_STR11: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR11"[0],
+						INV_ATTR_STR12: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR12"[0],
+						INV_ATTR_STR13: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR13"[0],
+						INV_ATTR_STR14: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR14"[0],
+				/*		INV_ATTR_STR15: vars.StoreZone, */
+				/*		INV_ATTR_STR15: 'Z-MOA',   */  
+				/*		INV_ATTR_STR16: val.INUMBR, */
+				/*		INV_ATTR_STR17: if (ToLocWS == 'W') getWhs(vars.TRFHDR.TRFTLC as String) else getStr(vars.TRFHDR.TRFTLC as String), */
+						INV_ATTR_STR15: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR15"[0],
+						INV_ATTR_STR16: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR16"[0],
+						INV_ATTR_STR17: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR17"[0],
+						INV_ATTR_STR18: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR18"[0],
+						INV_ATTR_INT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT1"[0],
+						INV_ATTR_INT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT2"[0],
+						INV_ATTR_INT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT3"[0],
+						INV_ATTR_INT4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT4"[0],
+						INV_ATTR_INT5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT5"[0],
+						INV_ATTR_FLT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT1"[0],
+						INV_ATTR_FLT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT2"[0],
+						INV_ATTR_FLT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT3"[0],
+						INV_ATTR_DTE1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1"[0],
+						INV_ATTR_DTE1_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMT"[0],
+						INV_ATTR_DTE1_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMTVAL"[0],
+						INV_ATTR_DTE2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2"[0],
+						INV_ATTR_DTE2_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMT"[0],
+						INV_ATTR_DTE2_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMTVAL"[0],
+						ALLOW_OVRSHPFLG: DftIFD."ORDER_LINE_SEG"."ALLOW_OVRSHPFLG"[0],
+						DISTRO_TYP: DftIFD."ORDER_LINE_SEG"."DISTRO_TYP"[0],
+						ORDLIN_CHG_REACOD: DftIFD."ORDER_LINE_SEG"."ORDLIN_CHG_REACOD"[0],
+						REACOD_CMNT: DftIFD."ORDER_LINE_SEG"."REACOD_CMNT"[0],
+						ASSET_TYP: DftIFD."ORDER_LINE_SEG"."ASSET_TYP"[0],
+						LOAD_ATTR1_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR1_CFG"[0],
+						LOAD_ATTR2_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR2_CFG"[0],
+						LOAD_ATTR3_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR3_CFG"[0],
+						LOAD_ATTR4_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR4_CFG"[0],
+						LOAD_ATTR5_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR5_CFG"[0],
+//						CANCELLED_FLG: DftIFD."ORDER_LINE_SEG"."CANCELLED_FLG"[0],
+// PEGD 2298:			CANCELLED_FLG: val.TRFSTS,
+                        CANCELLED_FLG: 0,
+						TOT_PLN_CUBE: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CUBE"[0],
+						TOT_PLN_WGT: DftIFD."ORDER_LINE_SEG"."TOT_PLN_WGT"[0],
+						TOT_PLN_CAS_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CAS_QTY"[0],
+						TOT_PLN_PAL_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_PAL_QTY"[0],
+						BLK_SLOT_ONLY_FLG: DftIFD."ORDER_LINE_SEG"."BLK_SLOT_ONLY_FLG"[0]
+					}
+				}),
+			
+			}
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				</otherwise>
+			</choice>
+		<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++ '_' ++ 'TRF_Reg_' ++ trim(vars.TRFHDR.PCGKEY) default '' ++ '_' 
+++ (now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;}) ++ '.xml']" doc:name="Out_FileName" doc:id="edf9950a-5e2f-41f8-995c-b4c7884008c1" variableName="Out_FileName" />
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.ORDER_INB_IFD.CTRL_SEG.WHSE_ID]" doc:name="WMS_Instance" doc:id="fa6fe5c6-bba1-4902-bf05-65f37cba453f" variableName="WMS_Instance" />
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="45aa52cb-72db-45bd-bdcb-885def3b6e40" variableName="Action" />
+			<flow-ref doc:name="Store XML to Message Store" doc:id="d01b50b0-b686-4ab5-a71b-031e22150823" name="MessageStore-Store-FromMMS-Flow" />
+			<logger level="INFO" doc:name="Logger" doc:id="9d288118-ef22-42c6-92c5-7beea125285a" message="#['\n\t stored XML into message store']" />
+			<jms:publish doc:name="Publish" doc:id="f80dacc2-196e-4332-818e-38a95a841636" config-ref="JMS_Config" destination="#[p('Queue.Outbound.' ++ vars.WMS_Instance)]" persistentDelivery="true" timeToLive="${JMSBroker.TimetoLive}" timeToLiveUnit="DAYS" />
+			<logger level="INFO" doc:name="Logger" doc:id="6bbbe17c-41be-4deb-8a41-caa18e454e65" message="#[vars.Out_FileName ++ 'Published to the Queue']" />
+			<error-handler>
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="4f043e00-e66f-4538-927a-ac8bd6acb3bb">
+					<flow-ref doc:name="GenErrorReport" doc:id="9e356a98-d213-4085-a062-200f350d7216" name="GenErrorReport" />
+				</on-error-continue>
+			</error-handler>
+		</try>
+	</sub-flow>
+</mule>

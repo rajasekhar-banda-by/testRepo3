@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd">
+	<sub-flow name="GenErrorReport" doc:id="c184942a-16ff-44ae-9b48-00dfafa81db9" >
+		<ee:transform doc:name="Transform Message" doc:id="89fb45e5-3cd5-4fb4-8ef7-5b172b881529" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<eframework:generate-error-report doc:name="Generate error report" doc:id="42026cde-8af3-4cbf-a064-8339dc88ba2e" messageType="#[vars.Global.MMSInstanceName default '' ++ '_' ++ vars.Global.FlowName ++ '_Error']" messageEntityId="#[vars.Global.InstanceIdentifier default '']" target="ErrorReport" config-ref="EFramework_Config"/>
+		<eframework:write-report-to-file doc:name="Write report to file" doc:id="9c8a743e-4e7b-4b98-bc3b-2f72dfdb5b83" errorReport="#[vars.ErrorReport]" messageType="#[vars.Global.MMSInstanceName default '' ++ '_' ++ vars.Global.FlowName ++ '_Error']" messageEntityId="#[vars.Global.InstanceIdentifier default '']" config-ref="EFramework_Config"/>
+	</sub-flow>
+</mule>

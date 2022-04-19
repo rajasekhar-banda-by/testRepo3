@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="wms-mms-inv-sts-test-suite.xml" />
+	<munit:test name="wms-mms-inv-sts-test-suite-Inbound_Inv_Sts_FlowTest" doc:id="9ef26d36-3548-4ea7-a966-259e86fbc944" description="Test">
+		<munit:behavior >
+			<munit:set-event doc:name="Set Event" doc:id="866c913c-048f-4ee5-9c48-df70fe8a921f" >
+				<munit:payload value='#[%dw 2.0
+output application/xml
+---
+readUrl("classpath://Inbound/InvSts/INV_STS1572.xml","application/xml") ]' />
+			</munit:set-event>
+			<munit-tools:mock-when doc:name="Store XML to Message Store" doc:id="91de8bc6-eef5-46b4-b6b8-7ab4334e39d4" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Store XML to Message Store" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Out_FileName" doc:id="d387ffd4-5397-4360-adbb-dc97efd8b073" processor="set-variable">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="11b31ef1-f59e-46d1-a5a9-557644b3cb5b" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Out_FileName" value="#['INVSTS_INVRCPT_20210204100528645_Detail.csv']" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Trg_FileName" doc:id="53a67e55-e69e-4b12-a88a-2e8d509e9e24" processor="set-variable">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="fb94b430-38ec-49b4-8f09-2ad79c1e9cf7" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Trg_FileName" value="#['INVSTS_INVRCPT_20210204100528645_Detail.trg']" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Store Header CSV to Message Store" doc:id="d3399c12-02e0-4b6b-9c7c-22b608383da1" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Store Header CSV to Message Store" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Write Header CSV to MMS Adapter Outbound Folder" doc:id="8991785b-b6f8-48d7-8c59-5df681ae223b" processor="file:write">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Write Header CSV to MMS Adapter Outbound Folder" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Write trigger file for Header" doc:id="757995e4-1206-46eb-bb44-79a79ba8497d" processor="file:write">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="418ceb22-1efd-43f9-b699-8dd8536ece6b" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Inbound_Inv_Sts_Flow" doc:id="63d145ac-99e8-453b-ae12-d9275d838d38" name="Inbound_Inv_Sts_Flow"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

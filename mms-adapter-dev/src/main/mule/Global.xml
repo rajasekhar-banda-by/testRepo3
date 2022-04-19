@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:cps="http://www.mulesoft.org/schema/mule/cps" xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/cps http://www.mulesoft.org/schema/mule/cps/current/mule-cps.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd">
+	
+
+<!-- Defaults which may be overwritten through deployment properties -->
+    <global-property name="cps.label" value=""/>
+    <global-property name="mule.env" value=""/>
+    <global-property name="cps.instance" value=""/>
+    <global-property name="cps.host" value="localhost"/>
+    <global-property name="cps.port" value="9810"/>
+    <global-property name="cps.trustStore" value="${app.home}/truststore.jks"/>
+    <global-property name="cps.trustStorePassword" value="changeme"/>
+    <global-property name="cps.keyStore" value=""/>
+    <global-property name="cps.keyStorePassword" value=""/>
+    <global-property name="cps.keyPassword" value=""/>
+    <global-property name="cps.useHostnameVerification" value="false"/>
+    <global-property name="cps.localFilesDirectory" value="${app.home}/config-repo"/>
+    <global-property name="cps.useLocalFiles" value="false"/>
+    <global-property name="cps.maxRetryStartup" value="-1"/>
+    <global-property name="cps.retryIntervalStartup" value="60000"/>
+    <global-property name="cps.maxRetryRuntime" value="10"/>
+    <global-property name="cps.retryIntervalRuntime" value="10000"/>
+    <global-property name="cps.protocol" value="HTTPS"/>	
+    
+    <cps:config name="ConfigurationService_Config" doc:name="ConfigurationService Config" doc:id="41b5cff0-80a9-4fae-a592-3ed6d5215215" applicationName="MmsAdapter" label="${cps.label}" 
+                environment="${mule.env}" 
+                categories="MessageStore,EFrameWork"
+                instance="${cps.instance}" 
+                useCaching="true" 
+                host="${cps.host}"
+                port="${cps.port}"
+                configDirectory="${cps.localFilesDirectory}"
+                trustStore="${cps.trustStore}" 
+                trustStorePassword="${cps.trustStorePassword}"
+                keyStore="${cps.keyStore}"
+                keyStorePassword="${cps.keyStorePassword}"
+                keyPassword="${cps.keyPassword}"
+                maxRetryStartup="${cps.maxRetryStartup}"
+                retryIntervalStartup="${cps.retryIntervalStartup}"
+                maxRetryRuntime="${cps.maxRetryRuntime}"
+                retryIntervalRuntime="${cps.retryIntervalRuntime}" 
+                protocol="${cps.protocol}"/>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="4da230dd-97e9-468c-aa97-ae66db84f29a" >
+		<http:request-connection host="localhost" port="${Http.port}" connectionIdleTimeout="3000000">
+		</http:request-connection>
+	</http:request-config>
+	<file:config name="MMS_Out_config" doc:name="File Config" doc:id="336957b7-c3ab-4ebf-8ae9-843ec2d13333" >
+		<file:connection workingDir="${MMS.OutBoundDir}"/>
+	</file:config>
+	<eframework:config name="EFramework_Config" doc:name="EFramework Config" doc:id="c7c4d3f2-004b-4020-96f3-7043a8c6fc6b" enabled="true" />
+	<os:object-store name="Object_store_mms_wms_Sku" doc:name="Object store" doc:id="aa6c2ee2-efdf-424a-b54e-5e24a4b61f4e" />
+	<jms:config name="JMS_Config" doc:name="JMS Config" doc:id="0320cf3a-8078-4738-9ba5-76ea34ab7560" >
+		<jms:active-mq-connection username="{JMSBroker.UserName}" password="{JMSBroker.Password}" specification="JMS_1_0_2b">
+			<jms:caching-strategy >
+				<jms:no-caching />
+			</jms:caching-strategy>
+			<jms:factory-configuration brokerUrl="tcp://TSBA141702001.JDADELIVERS.COM:31060" />
+		</jms:active-mq-connection>
+	</jms:config>
+	<os:object-store name="Object_Store_PO" doc:name="Object store" doc:id="dbcc19dd-c160-42d8-b41d-a799502fdfea" />
+	<message-store:config name="Message_Store_Config" doc:name="Message Store Config" doc:id="53651eac-ba4e-4da8-8d47-4c210f5a7878" serviceName="WST-WMS" serviceType="MMS" serviceInstance="MMS-FRANKFURT" serviceNamedVersion="MMS-2019.1.0" HTTPSRequestConfiguration="HTTP_Request_configuration" storeClientId="xx" storeClientSecret="xx" />
+	<file:config name="MMS_In_Config" doc:name="File Config" doc:id="763858e6-9b1a-47ca-96d4-f6a87bec18b5" >
+		<file:connection workingDir="${MMS.InBoundDir}" />
+	</file:config>
+	<configuration doc:name="Configuration" doc:id="043006f5-784d-4720-847d-292d0f8bd946" defaultErrorHandler-ref="globalError_Handler" />
+	<error-handler name="globalError_Handler" doc:id="72f9de5e-ac7c-4044-b823-0b13cc3c020f" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="bf9a70b4-2c96-4527-b625-f423a01802ae" >
+			<try doc:name="Try" doc:id="d21cab85-6763-4495-befa-4c3b4f33b178" >
+				<flow-ref doc:name="GenErrorReport" doc:id="623ee8e1-9790-4ea4-b1b6-df4b9d6ddf86" name="GenErrorReport"/>
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="79b3346a-71e1-42d3-b8d1-ac6a91c8fc6b" >
+						<logger level="DEBUG" doc:name="Logger" doc:id="9472161b-fb32-455b-ac72-b5568285c2a2" message="#[vars.global.MMSInstanceName]"/>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		</on-error-propagate>
+	</error-handler>
+</mule>

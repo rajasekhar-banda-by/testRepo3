@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="Outbound_Rtv_Control" doc:id="5cad39e3-c4d8-4d2a-8238-e94bcfd9555f" >
+		<logger level="INFO" doc:name="Logger" doc:id="35d47678-dcd5-44ee-affe-d16affa1a49a" message="#['\n\t RTV Processing Started']"/>
+		<flow-ref doc:name="getCrossRef_RTV_ORDER" doc:id="8a8eaeee-e1a2-447a-a382-18c7d38c4859" name="getCrossRef_RTV_ORDER"/>
+		<flow-ref doc:name="Outbound_Rtv_Process" doc:id="362d998d-4548-4b53-825a-e8c3531e2eba" name="Outbound_Rtv_Process"/>
+	</flow>
+	<sub-flow name="Outbound_Rtv_Process" doc:id="da536979-56f5-4206-a5e8-95e8f972ed7c" >
+		<file:read doc:name="Read" doc:id="577c759b-aca4-4629-97c7-48ffa6a5a42f" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="55aac51a-3cc2-40af-a186-1e7ec2d4d3a1" message="#['\n\t Input CSV Read']"/>
+		<set-variable value="#['Received']" doc:name="Action" doc:id="42067661-e7f2-45fa-bc20-7c50d904dc3b" variableName="Action"/>
+		<flow-ref doc:name="Store CSV to Message Store" doc:id="eb5f277b-f0bf-43d6-a4b8-ce50a8822647" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="5bead801-ab4b-4b81-b04b-e35627ff1fa9" message="#['\n\t Input CSV stored into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="6366c2d9-7ccd-4677-99ed-b7d10bc7ddd0">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var RTV =  (payload orderBy $.RTVNUM groupBy $.RTVNUM) pluck $
+---
+(RTV map (Hdr,Hdrindex) ->{
+	RTVHDR: {
+		RTVNUM : Hdr[0].RTVNUM,
+		PCGCDE : Hdr[0].PCGCDE,
+		PCGKEY : trim(Hdr[0].PCGKEY),
+		PCGNBR : Hdr[0].PCGNBR,
+		RTVIDT : Hdr[0].RTVIDT,
+		RTVVND : Hdr[0].RTVVND,
+		RTVSDT : Hdr[0].RTVSDT,
+		RTVFLC : Hdr[0].RTVFLC,
+		RTVTYP : Hdr[0].RTVTYP,
+		RTVDLC : Hdr[0].RTVDLC,
+		RTVREF : Hdr[0].RTVREF,
+		RTVBDT : Hdr[0].RTVBDT,  
+		RTRRAN : Hdr[0].RTRRAN,
+		RTRREF : Hdr[0].RTRREF,
+		RTSCOD : Hdr[0].RTSCOD,
+		RTVSTS : Hdr[0].RTVSTS,
+		RTSLOC : Hdr[0].RTSLOC,
+		BYNOT1 : Hdr[0].BYNOT1,
+// 5.7 Version Changes
+		CTHBOL : Hdr[0].CTHBOL,
+		CTHCID : Hdr[0].CTHCID
+		},
+	RTVDTL: Hdr map (Dtl,Dtlidx) ->{
+		RTVNUM : Dtl.RTVNUM,
+		IVNDPN : Dtl.IVNDPN,
+		RTVQTY : Dtl.RTVQTY,
+		RTVALC : Dtl.RTVALC,
+		RTVSHP : Dtl.RTVSHP,
+		IDEPT  : Dtl.IDEPT,
+		RDLSEQ : Dtl.RDLSEQ,
+		RDCTID : Dtl.RDCTID,
+		RTVCST : Dtl.RTVCST,
+// 5.7 Version Changes
+		RDRVNO : Dtl.RDRVNO
+	}
+} 
+)
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="82f79abe-e0a1-42c1-99a8-5812e656400d" >
+			<when expression="#[sizeOf(payload) != 0]">
+				<flow-ref doc:name="BatchProcess" doc:id="07e1aef1-f71e-43e9-a15e-cce237e8114c" name="Outbound_Rtv_Batch" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="7482e32f-6667-4543-9ffa-fdc93f83acab" message="#['\n\t Process Completed. No Payload to Process']"/>
+			</otherwise>
+		</choice>
+	
+	</sub-flow>
+	<flow name="Outbound_Rtv_Batch" doc:id="32f5502b-0936-41a1-9462-a09d9a250e32" >
+		<batch:job jobName="mms-wms-Rtv_Batch_Job" doc:id="fa85342a-729f-4825-8f5a-ea0e77979497" blockSize="10">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="9de27a37-cb45-4078-b73a-537c88ba1059" >
+					<flow-ref doc:name="Outbound_Rtv_genXML" doc:id="6319388e-c7b6-4549-a092-ed0fb59eaf8f" name="Outbound_Rtv_genXML"/>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<logger level="INFO" doc:name="Logger" doc:id="fad495d3-924c-4cd0-a921-3d01946717fb" message="#['\n\t Process Completed']"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	<sub-flow name="Outbound_Rtv_genXML" doc:id="6e68e5e7-9216-4e60-a087-606c6624feed" >
+		<try doc:name="Try" doc:id="8e6c7c86-6d01-4eb6-bab0-8aea0d9ca7e1" >
+			<set-variable value="#[payload.RTVHDR]" doc:name="RTVHDR" doc:id="dd2cc300-c16e-4985-af25-35eea8ab813e" variableName="RTVHDR"/>
+			<set-payload value="#[payload.RTVDTL]" doc:name="RTVDTL" doc:id="d2d68315-8bd5-4c15-a5c3-a3a2be9e49c1" />
+			<choice doc:name="Choice" doc:id="f0af96ab-fb43-484a-b0ef-a894d39d1e0f" >
+				<when expression="#[vars.RTVHDR.PCGCDE == 'D']">
+					<ee:transform doc:name="Transform Message" doc:id="bf4cd974-6dee-4af4-85e3-7b1e53a2ad4f" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml  skipNullOn = "everywhere"
+var DftIFD 		= vars.Transfer_CrossRefValues
+var wareHouse 	= vars.TRFHDR.PCGNBR as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+---
+{
+	ORDER_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			ORDER_SEG: {
+				SEGNAM: DftIFD."ORDER_SEG"."SEGNAM"[0],
+				TRNTYP: vars.TRFHDR.PCGCDE ,												
+				CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+				ORDNUM: (vars.TRFHDR.PCGKEY)[0 to 7],
+			
+			}
+		}
+	}
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</when>
+				<otherwise>
+					<validation:is-true doc:id="77c55dcb-e0d5-40b7-ab56-4a7ff4a214f3" expression="#[sizeOf(payload) != 0 ]" message="#[vars.global.MMSInstanceName ++ &quot;_Rtv &quot; ++ trim(vars.RTVHDR.RTVNUM) default ' ' ++ &quot; No records found &quot;]" doc:name="Is true/RtvDtl validation"/>
+					<ee:transform doc:name="generate xml" doc:id="3e6d95c9-840d-47a2-9295-dd438f69d869">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml  skipNullOn = "everywhere" 
+var DftIFD 		= vars.Rtv_CrossRefValues
+//var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''        
+//var WhsPref 	= DftIFD."HOSTMAP"."DCTODCPRE" default ''     
+var SupPrex	    = DftIFD."HOSTMAP"."SUPPPRE" default ' '       
+var VndPrex	    = DftIFD."HOSTMAP"."VENDORPRE" default ' '       
+var wareHouse 	= vars.RTVHDR.RTVFLC as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ' '
+var RtvNum		= vars.RTVHDR.RTVNUM
+//var Rtvpaded	= ('000000000000000' ++ RtvNum)[sizeOf(RtvNum) to (sizeOf(RtvNum) + 14)]
+//var TrukDtl		=  client ++ 'S' ++ Rtvpaded
+//  var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''   
+fun DateConv (date6)= date6 + 20000000
+//fun getStr(Store)   = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+//fun getWhs(Store)   = WhsPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getVnd(Vendor)  = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+//fun getSup(Supplier)  = SupPrex[0] ++ ('000000' ++ Supplier)[sizeOf(Supplier) to (sizeOf(Supplier) + 5)]
+fun getSup(Supplier)  = SupPrex[0] ++ ('00000' ++ Supplier)[sizeOf(Supplier) to (sizeOf(Supplier) + 4)]
+
+---
+{
+	ORDER_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+						
+			ORDER_SEG: {
+				SEGNAM: DftIFD."ORDER_SEG"."SEGNAM"[0],
+				TRNTYP: if (vars.RTVHDR.PCGCDE == 'D') vars.RTVHDR.PCGCDE else 'R',		/*Always send R(For A/C) */												
+				CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+				ORDNUM: if (vars.RTVHDR.PCGCDE == 'D') 'R' ++ vars.RTVHDR.PCGKEY as String else 'R' ++ vars.RTVHDR.RTVNUM as String ,
+				/*DC to DC transfer type is 3 */
+//				ORDTYP: if (vars.RTVHDR.TRFTYP == '3') 'STDR' else 'STSD',				
+				ORDTYP: DftIFD."ORDER_SEG"."ORDTYP"[0],
+//				ENTDTE: DftIFD."ORDER_SEG"."ENTDTE"[0],
+				ENTDTE: DateConv(vars.RTVHDR.RTVIDT), 
+			/*	STCUST: if (ToLocWS == 'W') getWhs(vars.RTVHDR.TRFTLC as String) else getStr(vars.RTVHDR.TRFTLC as String), */
+				STCUST: getVnd(vars.RTVHDR.RTVVND as String) default '',				
+				ST_HOST_ADR_ID: DftIFD."ORDER_SEG"."ST_HOST_ADR_ID"[0],
+//				RTCUST: vars.StoreZone,	 
+			/*	RTCUST: 'Z-MOA', */										
+				RTCUST: getVnd(vars.RTVHDR.RTVVND as String) default '',				
+				RT_HOST_ADR_ID: DftIFD."ORDER_SEG"."RT_HOST_ADR_ID"[0],
+			/*	BTCUST: if (ToLocWS == 'W') getWhs(vars.RTVHDR.TRFTLC as String) else getStr(vars.RTVHDR.TRFTLC as String), */
+//				BTCUST: getStBt,
+				BTCUST: getVnd(vars.RTVHDR.RTVVND as String) default '',				
+				BT_HOST_ADR_ID: DftIFD."ORDER_SEG"."BT_HOST_ADR_ID"[0],
+//				CPONUM: DftIFD."ORDER_SEG"."CPONUM"[0],
+				CPONUM: vars.RTVHDR.RTVREF,
+//				CPODTE: DftIFD."ORDER_SEG"."CPODTE"[0],
+				CPODTE: DateConv(vars.RTVHDR.RTVIDT), 
+				CPOTYP: DftIFD."ORDER_SEG"."CPOTYP"[0],
+				PAYTRM: DftIFD."ORDER_SEG"."PAYTRM"[0],
+				CARFLG: DftIFD."ORDER_SEG"."CARFLG"[0],
+//				SHIPBY: DftIFD."ORDER_SEG"."SHIPBY"[0],
+//				SHIPBY: vars.RTVHDR.RTVNUM,
+				RRLFLG: DftIFD."ORDER_SEG"."RRLFLG"[0],
+				WAVE_FLG: DftIFD."ORDER_SEG"."WAVE_FLG"[0],
+				REQUIR_TMS_FLG: DftIFD."ORDER_SEG"."REQUIR_TMS_FLG"[0],
+				COD_FLG: DftIFD."ORDER_SEG"."COD_FLG"[0],
+				ORD_FRTRTE: DftIFD."ORDER_SEG"."ORD_FRTRTE"[0],
+				BCO_FLG: DftIFD."ORDER_SEG"."BCO_FLG"[0],
+				SIG_REQ_FLG: DftIFD."ORDER_SEG"."SIG_REQ_FLG"[0],
+				BILL_FREIGHT_FLG: DftIFD."ORDER_SEG"."BILL_FREIGHT_FLG"[0],
+				COD_PAYMENT_TYPE: DftIFD."ORDER_SEG"."COD_PAYMENT_TYPE"[0],
+				PAYMENT_TYPE: DftIFD."ORDER_SEG"."PAYMENT_TYPE"[0],
+				RMANUM: DftIFD."ORDER_SEG"."RMANUM"[0],
+				BRCUST: DftIFD."ORDER_SEG"."BRCUST"[0],
+				BR_HOST_ADR_ID: DftIFD."ORDER_SEG"."BR_HOST_ADR_ID"[0],
+				COD_IND_TYPE: DftIFD."ORDER_SEG"."COD_IND_TYPE"[0],
+				CUSTOMS_CLR_FLG: DftIFD."ORDER_SEG"."CUSTOMS_CLR_FLG"[0],
+				SRV_TYPE: DftIFD."ORDER_SEG"."SRV_TYPE"[0],
+				CRNCY_CODE: DftIFD."ORDER_SEG"."CRNCY_CODE"[0],
+				BTO_SEQNUM: DftIFD."ORDER_SEG"."BTO_SEQNUM"[0],
+				SLOT: DftIFD."ORDER_SEG"."SLOT"[0],
+				RUSH_FLG: DftIFD."ORDER_SEG"."RUSH_FLG"[0],
+				DEPTNO: DftIFD."ORDER_SEG"."DEPTNO"[0],
+				DEST_NUM: DftIFD."ORDER_SEG"."DEST_NUM"[0],
+				DUTY_PAYMENT_TYPE: DftIFD."ORDER_SEG"."DUTY_PAYMENT_TYPE"[0],
+				DUTY_PAYMENT_ACCT: DftIFD."ORDER_SEG"."DUTY_PAYMENT_ACCT"[0],
+				CSTMS_DTYCUST: DftIFD."ORDER_SEG"."CSTMS_DTYCUST"[0],
+				EXCISE_DTYCUST: DftIFD."ORDER_SEG"."EXCISE_DTYCUST"[0],
+				CSTMS_ORDTYP: DftIFD."ORDER_SEG"."CSTMS_ORDTYP"[0],
+				DFLT_ORDLIN_CHG_REACOD: DftIFD."ORDER_SEG"."DFLT_ORDLIN_CHG_REACOD"[0],
+				PLAN_SLOT_SEQ: DftIFD."ORDER_SEG"."PLAN_SLOT_SEQ"[0],
+				DLVSEQ: DftIFD."ORDER_SEG"."DLVSEQ"[0],
+				DLVNUM: DftIFD."ORDER_SEG"."DLVNUM"[0],
+						
+				/* Write First Box Details at Store Level  */
+				(payload map (val,idx) -> {				
+					ORDER_LINE_SEG: {
+						SEGNAM: DftIFD."ORDER_LINE_SEG"."SEGNAM"[0],
+						ORDNUM: 'R' ++ vars.RTVHDR.RTVNUM as String,
+//						ORDLIN: 10 * (idx + 1),
+						ORDLIN: val.RDLSEQ,
+//						ORDSLN: DftIFD."ORDER_LINE_SEG"."ORDSLN"[0],		/*Pending whether 0 is fine */
+						ORDSLN: vars.RTVHDR.RTRRAN,
+//						SALES_ORDNUM: vars.RTVHDR.TRFBCH,
+//						SALES_ORDLIN: vars.RTVHDR.TRFFLC,
+//						ENTDTE: DftIFD."ORDER_LINE_SEG"."ENTDTE"[0],
+						ENTDTE: DateConv(vars.RTVHDR.RTVIDT), 
+//						PRTNUM: val.INUMBR,											/*SKU Level */
+						PRTNUM: val.IVNDPN,
+//						PRT_CLIENT_ID: DftIFD."HOSTMAP"."CLIENT_ID"[0],
+						PRT_CLIENT_ID: client,
+						ORGCOD: DftIFD."ORDER_LINE_SEG"."ORGCOD"[0],
+						REVLVL: DftIFD."ORDER_LINE_SEG"."REVLVL"[0],
+						LOTNUM: DftIFD."ORDER_LINE_SEG"."LOTNUM"[0],
+						SUP_LOTNUM: DftIFD."ORDER_LINE_SEG"."SUP_LOTNUM"[0],
+						INVSTS: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS"[0],			/*SKU Level */
+						ORDQTY: val.RTVALC,
+						MARCOD: DftIFD."ORDER_LINE_SEG"."MARCOD"[0],
+						PRCPRI: DftIFD."ORDER_LINE_SEG"."PRCPRI"[0],
+						OVAFLG: DftIFD."ORDER_LINE_SEG"."OVAFLG"[0],
+						OVPFLG: DftIFD."ORDER_LINE_SEG"."OVPFLG"[0],
+						RPQFLG: DftIFD."ORDER_LINE_SEG"."RPQFLG"[0],
+						OVRCOD: DftIFD."ORDER_LINE_SEG"."OVRCOD"[0],
+						OVRAMT: DftIFD."ORDER_LINE_SEG"."OVRAMT"[0],
+						STDFLG: DftIFD."ORDER_LINE_SEG"."STDFLG"[0],
+						PARFLG: DftIFD."ORDER_LINE_SEG"."PARFLG"[0],
+//						PARFLG: if(vars.RTVHDR.RTVPTY == 'I') '0' else '1',
+						BCKFLG: DftIFD."ORDER_LINE_SEG"."BCKFLG"[0],
+						CARCOD: DftIFD."ORDER_LINE_SEG"."CARCOD"[0], 
+				/*		CARCOD: 'Z-MOA',*/
+						CARGRP: DftIFD."ORDER_LINE_SEG"."CARGRP"[0],
+//						SRVLVL: DftIFD."ORDER_LINE_SEG"."SRVLVL"[0],
+//						SRVLVL: if (vars.RTVHDR.BYNOT1 == ' ' or vars.RTVHDR.BYNOT1 == '') 'Z4' else vars.RTVHDR.BYNOT1 default 'Z4',
+						SRVLVL: if (trim(vars.RTVHDR.BYNOT1) != '') vars.RTVHDR.BYNOT1 else 'Z4',
+//						SRVLVL: vars.RTVHDR.RTRRAN,
+						SDDFLG: DftIFD."ORDER_LINE_SEG"."SDDFLG"[0],
+						FRTCOD: DftIFD."ORDER_LINE_SEG"."FRTCOD"[0],
+						COOINC: DftIFD."ORDER_LINE_SEG"."COOINC"[0],
+						COOLST: DftIFD."ORDER_LINE_SEG"."COOLST"[0],
+						ACCNUM: DftIFD."ORDER_LINE_SEG"."ACCNUM"[0],
+//						PRJNUM: DftIFD."ORDER_LINE_SEG"."PRJNUM"[0],
+						PRJNUM: vars.RTVHDR.RTRREF,
+						CSTPRT: DftIFD."ORDER_LINE_SEG"."CSTPRT"[0],
+						MANFID: DftIFD."ORDER_LINE_SEG"."MANFID"[0],
+						DEPTNO: DftIFD."ORDER_LINE_SEG"."DEPTNO"[0],
+						UNTPAK: DftIFD."ORDER_LINE_SEG"."UNTPAK"[0],
+						UNTPAL: DftIFD."ORDER_LINE_SEG"."UNTPAL"[0],
+						UNTCAS: DftIFD."ORDER_LINE_SEG"."UNTCAS"[0],
+//						EARLY_SHPDTE: DftIFD."ORDER_LINE_SEG"."EARLY_SHPDTE"[0],
+						EARLY_SHPDTE: DateConv(vars.RTVHDR.RTVBDT), 
+						EARLY_DLVDTE: DftIFD."ORDER_LINE_SEG"."EARLY_DLVDTE"[0],
+						LATE_SHPDTE: DftIFD."ORDER_LINE_SEG"."LATE_SHPDTE"[0],
+						LATE_DLVDTE: DftIFD."ORDER_LINE_SEG"."LATE_DLVDTE"[0],
+						SRC_HOST_ADR_ID: DftIFD."ORDER_LINE_SEG"."SRC_HOST_ADR_ID"[0],
+						RSVPRI: DftIFD."ORDER_LINE_SEG"."RSVPRI"[0],
+						RSVQTY: DftIFD."ORDER_LINE_SEG"."RSVQTY"[0],
+						PCKGR1: DftIFD."ORDER_LINE_SEG"."PCKGR1"[0],
+						PCKGR2: DftIFD."ORDER_LINE_SEG"."PCKGR2"[0],
+						PCKGR3: DftIFD."ORDER_LINE_SEG"."PCKGR3"[0],
+						PCKGR4: DftIFD."ORDER_LINE_SEG"."PCKGR4"[0],
+						DST_MOV_ZONE_ID: DftIFD."ORDER_LINE_SEG"."DST_MOV_ZONE_ID"[0],
+//						DSTLOC: vars.StoreZone, 
+				/*		DSTLOC: 'Z-MOA',*/							
+//						XDKFLG: DftIFD."ORDER_LINE_SEG"."XDKFLG"[0],
+						XDKFLG: if (vars.RTVHDR.RTVTYP == '2') '1' else '0',
+						PRT_DL_TYP: DftIFD."ORDER_LINE_SEG"."PRT_DL_TYP"[0],
+						ATOFLG: DftIFD."ORDER_LINE_SEG"."ATOFLG"[0],
+//						HOST_ORDQTY: val.TRFALC,
+						HSTSTS: DftIFD."ORDER_LINE_SEG"."HSTSTS"[0],
+						SPLFLG: DftIFD."ORDER_LINE_SEG"."SPLFLG"[0],
+//						INVSTS_PRG: DftIFD."ORDER_LINE_SEG_SKU"."INVSTS_PRG"[0],
+						INVSTS_PRG: if(vars.RTVHDR.RTVPTY != 'D' and vars.RTVHDR.RTVPTY != 'F') 'A' else vars.RTVHDR.RTVPTY,
+						FRSFLG: DftIFD."ORDER_LINE_SEG"."FRSFLG"[0],
+						MIN_SHELF_HRS: DftIFD."ORDER_LINE_SEG"."MIN_SHELF_HRS"[0],
+						ORDINV: DftIFD."ORDER_LINE_SEG"."ORDINV"[0],
+						NON_ALC_FLG: DftIFD."ORDER_LINE_SEG"."NON_ALC_FLG"[0],
+						UNT_PRICE: DftIFD."ORDER_LINE_SEG"."UNT_PRICE"[0],
+						WAVE_SET: DftIFD."ORDER_LINE_SEG"."WAVE_SET"[0],
+						CRNCY_NAME: DftIFD."ORDER_LINE_SEG"."CRNCY_NAME"[0],
+						TOT_PLN_MISC_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC_QTY"[0],
+						TOT_PLN_MISC2_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_MISC2_QTY"[0],
+						ALC_SEARCH_PATH: DftIFD."ORDER_LINE_SEG"."ALC_SEARCH_PATH"[0],
+						SUPNUM: DftIFD."ORDER_LINE_SEG"."SUPNUM"[0],
+						CRNCY_CODE: DftIFD."ORDER_LINE_SEG"."CRNCY_CODE"[0],
+						BTO_COMCOD: DftIFD."ORDER_LINE_SEG"."BTO_COMCOD"[0],
+						BTO_DLV_SEQ: DftIFD."ORDER_LINE_SEG"."BTO_DLV_SEQ"[0],
+						BTO_STATION: DftIFD."ORDER_LINE_SEG"."BTO_STATION"[0],
+						BTO_SIDE: DftIFD."ORDER_LINE_SEG"."BTO_SIDE"[0],
+						BTO_BAY: DftIFD."ORDER_LINE_SEG"."BTO_BAY"[0],
+						FTPCOD: DftIFD."ORDER_LINE_SEG"."FTPCOD"[0],
+						ABS_ORDINV_WIN: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_WIN"[0],
+						ABS_ORDINV_CODE: DftIFD."ORDER_LINE_SEG"."ABS_ORDINV_CODE"[0],
+						PAYTRM: DftIFD."ORDER_LINE_SEG"."PAYTRM"[0],
+						SED_EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."SED_EXPORT_TYP"[0],
+//						COONUM: val.DPTNAM replace "'" with(" "),
+						COONUM: DftIFD."ORDER_LINE_SEG"."COONUM"[0],
+						COOTYP: DftIFD."ORDER_LINE_SEG"."COOTYP"[0],
+						ECCN: DftIFD."ORDER_LINE_SEG"."ECCN"[0],
+						EXPLICEXCPT: DftIFD."ORDER_LINE_SEG"."EXPLICEXCPT"[0],
+						EXPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."EXPLICEXPDTE"[0],
+						EXPLICNUM: DftIFD."ORDER_LINE_SEG"."EXPLICNUM"[0],
+						IMPLICEXCPT: DftIFD."ORDER_LINE_SEG"."IMPLICEXCPT"[0],
+						IMPLICEXPDTE: DftIFD."ORDER_LINE_SEG"."IMPLICEXPDTE"[0],
+						IMPLICNUM: DftIFD."ORDER_LINE_SEG"."IMPLICNUM"[0],
+						MARKSNUMBERS: DftIFD."ORDER_LINE_SEG"."MARKSNUMBERS"[0],
+						NAFTABEGDTE: DftIFD."ORDER_LINE_SEG"."NAFTABEGDTE"[0],
+						NAFTAENDDTE: DftIFD."ORDER_LINE_SEG"."NAFTAENDDTE"[0],
+						NAFTA_PREF_CRIT: DftIFD."ORDER_LINE_SEG"."NAFTA_PREF_CRIT"[0],
+						NAFTA_PRODUCER: DftIFD."ORDER_LINE_SEG"."NAFTA_PRODUCER"[0],
+						SEDFLG: DftIFD."ORDER_LINE_SEG"."SEDFLG"[0],
+						TRADEAGREETYP: DftIFD."ORDER_LINE_SEG"."TRADEAGREETYP"[0],
+						EXPORT_TYP: DftIFD."ORDER_LINE_SEG"."EXPORT_TYP"[0],
+						RULE_NAM: DftIFD."ORDER_LINE_SEG"."RULE_NAM"[0],
+						MANDTE: DftIFD."ORDER_LINE_SEG"."MANDTE"[0],
+						EXPIRE_DTE: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE"[0],
+						MANDTE_FMT: DftIFD."ORDER_LINE_SEG"."MANDTE_FMT"[0],
+						MANDTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."MANDTE_FMTVAL"[0],
+						EXPIRE_DTE_FMT: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMT"[0],
+						EXPIRE_DTE_FMTVAL: DftIFD."ORDER_LINE_SEG"."EXPIRE_DTE_FMTVAL"[0],
+//						DISTRO_ID: DftIFD."ORDER_LINE_SEG"."DISTRO_ID"[0],
+// 5.7 Version Changes	DISTRO_ID: ('R' ++ trim(vars.RTVHDR.RTVNUM as String) ++ (val.RDLSEQ as String)),
+                        DISTRO_ID: ('R' ++ trim(val.RDRVNO as String) ++ (val.RDLSEQ as String)),
+						SOURCE_WH: DftIFD."ORDER_LINE_SEG"."SOURCE_WH"[0],
+						SOURCE_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_DISTRO_ID"[0],
+						SOURCE_WH_HOST_EXT_ID: DftIFD."ORDER_LINE_SEG"."SOURCE_WH_HOST_EXT_ID"[0],
+						PROMO_COD: DftIFD."ORDER_LINE_SEG"."PROMO_COD"[0],
+//						INVNUM: DftIFD."ORDER_LINE_SEG"."INVNUM"[0],
+// 5.7 Version Changes	INVNUM: if (vars.RTVHDR.RTVTYP == '2') vars.RTVHDR.RTSCOD else '',
+                        INVNUM:  vars.RTVHDR.CTHBOL,
+			 			SUPNUM_DISTRO: if (vars.RTVHDR.RTVTYP == '2' and vars.RTVHDR.RTSLOC != null) getSup(vars.RTVHDR.RTSLOC as String) else '',    
+//						TRKNUM: if (vars.RTVHDR.RTVTYP == '2') vars.RTVHDR.RTSCOD else '',
+// 5.7 Version Changes	TRKNUM: if (vars.RTVHDR.RTVTYP == '2') val.RDCTID else '',
+                        TRKNUM: vars.RTVHDR.CTHBOL,
+// 5.7 Version Changes	INVLIN: if (vars.RTVHDR.RTVTYP == '2') val.RDLSEQ else '',
+                        INVLIN: val.RDLSEQ as String,
+						INVSLN: DftIFD."ORDER_LINE_SEG"."INVSLN"[0],
+						STO_ALC_FLG: DftIFD."ORDER_LINE_SEG"."STO_ALC_FLG"[0],
+						ORG_DISTRO_ID: DftIFD."ORDER_LINE_SEG"."ORG_DISTRO_ID"[0],
+						INV_ATTR_STR1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR1"[0],
+						INV_ATTR_STR2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR2"[0],
+						INV_ATTR_STR3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR3"[0],
+						INV_ATTR_STR4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR4"[0],
+						INV_ATTR_STR5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR5"[0],
+						INV_ATTR_STR6: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR6"[0],
+						INV_ATTR_STR7: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR7"[0],
+						INV_ATTR_STR8: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR8"[0],
+						INV_ATTR_STR9: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR9"[0],
+						INV_ATTR_STR10: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR10"[0],
+						INV_ATTR_STR11: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR11"[0],
+						INV_ATTR_STR12: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR12"[0],
+						INV_ATTR_STR13: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR13"[0],
+						INV_ATTR_STR14: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR14"[0],
+				/*		INV_ATTR_STR15: vars.StoreZone, */
+				/*		INV_ATTR_STR15: 'Z-MOA',   */  
+				/*		INV_ATTR_STR16: val.INUMBR, */
+				/*		INV_ATTR_STR17: if (ToLocWS == 'W') getWhs(vars.RTVHDR.TRFTLC as String) else getStr(vars.RTVHDR.TRFTLC as String), */
+						INV_ATTR_STR15: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR15"[0],
+						INV_ATTR_STR16: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR16"[0],
+						INV_ATTR_STR17: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR17"[0],
+						INV_ATTR_STR18: DftIFD."ORDER_LINE_SEG"."INV_ATTR_STR18"[0],
+						INV_ATTR_INT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT1"[0],
+						INV_ATTR_INT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT2"[0],
+						INV_ATTR_INT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT3"[0],
+						INV_ATTR_INT4: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT4"[0],
+						INV_ATTR_INT5: DftIFD."ORDER_LINE_SEG"."INV_ATTR_INT5"[0],
+						INV_ATTR_FLT1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT1"[0],
+						INV_ATTR_FLT2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT2"[0],
+						INV_ATTR_FLT3: DftIFD."ORDER_LINE_SEG"."INV_ATTR_FLT3"[0],
+						INV_ATTR_DTE1: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1"[0],
+						INV_ATTR_DTE1_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMT"[0],
+						INV_ATTR_DTE1_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE1_FMTVAL"[0],
+						INV_ATTR_DTE2: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2"[0],
+						INV_ATTR_DTE2_FMT: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMT"[0],
+						INV_ATTR_DTE2_FMTVAL: DftIFD."ORDER_LINE_SEG"."INV_ATTR_DTE2_FMTVAL"[0],
+						ALLOW_OVRSHPFLG: DftIFD."ORDER_LINE_SEG"."ALLOW_OVRSHPFLG"[0],
+						DISTRO_TYP: if (vars.RTVHDR.RTVTYP == '2') DftIFD."ORDER_LINE_SEG"."DISTRO_TYP"[0] else null,
+						ORDLIN_CHG_REACOD: DftIFD."ORDER_LINE_SEG"."ORDLIN_CHG_REACOD"[0],
+						REACOD_CMNT: DftIFD."ORDER_LINE_SEG"."REACOD_CMNT"[0],
+						ASSET_TYP: DftIFD."ORDER_LINE_SEG"."ASSET_TYP"[0],
+						LOAD_ATTR1_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR1_CFG"[0],
+						LOAD_ATTR2_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR2_CFG"[0],
+						LOAD_ATTR3_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR3_CFG"[0],
+						LOAD_ATTR4_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR4_CFG"[0],
+						LOAD_ATTR5_CFG: DftIFD."ORDER_LINE_SEG"."LOAD_ATTR5_CFG"[0],
+						CANCELLED_FLG: DftIFD."ORDER_LINE_SEG"."CANCELLED_FLG"[0],
+						TOT_PLN_CUBE: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CUBE"[0],
+						TOT_PLN_WGT: DftIFD."ORDER_LINE_SEG"."TOT_PLN_WGT"[0],
+						TOT_PLN_CAS_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_CAS_QTY"[0],
+						TOT_PLN_PAL_QTY: DftIFD."ORDER_LINE_SEG"."TOT_PLN_PAL_QTY"[0],
+						BLK_SLOT_ONLY_FLG: DftIFD."ORDER_LINE_SEG"."BLK_SLOT_ONLY_FLG"[0]
+					}
+				}),
+			
+			}
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				</otherwise>
+			</choice>
+		<set-variable value="#[%dw 2.0 output application/json 
+---
+vars.Global.MMSInstanceName ++ '_' ++ 'RTV_' ++ trim(vars.RTVHDR.PCGKEY) default '' ++ '_' 
+++ (now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;}) ++ '.xml']" doc:name="Out_FileName" doc:id="edf9950a-5e2f-41f8-995c-b4c7884008c1" variableName="Out_FileName"/>
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="4c874ef8-d229-43c2-abba-46ae4a83521e" variableName="Action"/>
+			<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.ORDER_INB_IFD.CTRL_SEG.WHSE_ID]" doc:name="WMS_Instance" doc:id="5a6d5c26-5f4f-4721-8c7c-fe268247c55a" variableName="WMS_Instance"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="ffc5b288-05da-4077-84b7-cae2a6120415" name="MessageStore-Store-FromMMS-Flow"/>
+			<logger level="INFO" doc:name="Logger" doc:id="0eeaff03-1d0a-4b2d-8ee5-92ec1cd8243f" message="#['\n\t Stored XML file to Message Store']"/>
+			<jms:publish doc:name="Publish" doc:id="840c33b2-5b00-4908-b34e-cc6454f35cf0" config-ref="JMS_Config" destination="#[p('Queue.Outbound.' ++ vars.WMS_Instance)]" persistentDelivery="true" timeToLive="${JMSBroker.TimetoLive}" timeToLiveUnit="DAYS"/>
+			<logger level="INFO" doc:name="Logger" doc:id="6bbbe17c-41be-4deb-8a41-caa18e454e65" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="4f043e00-e66f-4538-927a-ac8bd6acb3bb" >
+					<flow-ref doc:name="GenErrorReport" doc:id="9e356a98-d213-4085-a062-200f350d7216" name="GenErrorReport"/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+	</sub-flow>
+</mule>

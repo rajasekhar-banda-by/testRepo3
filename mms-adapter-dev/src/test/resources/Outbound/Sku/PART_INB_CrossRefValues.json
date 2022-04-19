@@ -1,0 +1,135 @@
+	[
+	  {
+	    "WHSE_ID": {
+	      "555": "CHAPTER1"
+	    }
+	  },
+	  {
+	    "HOSTMAP": {
+	      "STRPRE": "S",
+	      "STRZNPRE": "Z",
+	      "VENDORPRE": "V",
+	      "DCTODCPRE": "W",
+	      "CLIENTID": "----"
+	    }
+	  },
+	  {
+	    "CTRL_SEG": {
+	      "TRANNAM": "PART_TRAN",
+	      "TRANVER": "9.0"
+	    }
+	  },
+	  {
+	    "PART_SEG": {
+	      "SEGNAM": "PART",
+	      "LODLVL": "L",
+	      "ORGFLG": "0",
+	      "REVFLG": "0",
+	      "LOTFLG": "0",
+	      "SUP_LOT_FLG": "0",
+	      "UNTCST": "1",
+	      "STKUOM": "EA",
+	      "RCVSTS": "A",
+	      "RCVUOM": "EA",
+	      "RCVFLG": "0",
+	      "PRDFLG": "1",
+	      "CNZFLG": "0",
+	      "PARCEL_FLG": "0",
+	      "PRTADJFLG": "1",
+	      "PCK_STEAL_FLG": "0",
+	      "CRNCY_CODE": "GBP",
+	      "DSPUOM": "EA",
+	      "RPTUOM": "EA"
+	    }
+	  },
+	  {
+	    "PART_DESCRIPTION_SEG": {
+	      "SEGNAM": "PART_DESC",
+	      "LOCALE_ID": "US_ENGLISH"
+	    }
+	  },
+	  {
+	    "REPACK_CLASS_SEG": {
+	      
+	    }
+	  },
+	  {
+	    "PART_ALT_PRTNUM_SEG_UPC": {
+	      "SEGNAM": "ALT_PRTNUM",
+	      "ALT_PRT_TYP": "UPCCOD",
+	      "DSP_PRT_FLG": "0"
+	    }
+	  },
+	  {
+	    "PART_ALT_PRTNUM_SEG_VDR": {
+	      "SEGNAM": "ALT_PRTNUM",
+	      "ALT_PRT_TYP": "VDRCOD",
+	      "DSP_PRT_FLG": "0"
+	    }
+	  },
+	  {
+	    "PART_FOOTPRINT_SEG": {
+	      "SEGNAM": "PART_FOOTPRINT",
+	      "LNGDSC": "FTP",
+	      "LOCALE_ID": "US_ENGLISH",
+	      "CASLVL": "9999",
+	      "PAL_STCK_HGT": "0",
+	      "DEFFTP_FLG": "1",
+	      "LOAD_ATTR1_CFG": "0",
+	      "LOAD_ATTR2_CFG": "0",
+	      "LOAD_ATTR3_CFG": "0",
+	      "LOAD_ATTR4_CFG": "0",
+	      "LOAD_ATTR5_CFG": "0"
+	    }
+	  },
+	  {
+	    "PART_FOOTPRINT_DTL_SEG_PC": {
+	      "WID": ""
+	    }
+	  },
+	  {
+	    "PART_FOOTPRINT_DTL_SEG_IP": {
+	      
+	    }
+	  },
+	  {
+	    "PART_FOOTPRINT_DTL_SEG_CS": {
+	      "SEGNAM": "PART_FOOTPRINT_DTL",
+	      "UOMCOD": "EA",
+	      "WID": "",
+	      "GRSWGT": "",
+	      "NETWGT": "",
+	      "PAL_FLG": "0",
+	      "CAS_FLG": "1",
+	      "PAK_FLG": "0",
+	      "STK_FLG": "1",
+	      "RCV_FLG": "1",
+	      "UNTQTY": "1",
+	      "CTN_FLG": "1",
+	      "THRESH_PCT": "100",
+	      "CTN_DSTR_FLG": "0",
+	      "BULK_PCK_FLG": "0",
+	      "CTRLFLAG": ""
+	    }
+	  },
+	  {
+	    "PART_FOOTPRINT_DTL_SEG_PA": {
+	      "SEGNAM": "PART_FOOTPRINT_DTL",
+	      "UOMCOD": "PA",
+	      "UOMLVL": "1",
+	      "GRSWGT": "",
+	      "NETWGT": "",
+	      "PAL_FLG": "1",
+	      "CAS_FLG": "0",
+	      "PAK_FLG": "0",
+	      "STK_FLG": "0",
+	      "RCV_FLG": "0",
+	      "UNTQTY": "999999",
+	      "CTN_FLG": "1",
+	      "THRESH_PCT": "100",
+	      "CTN_DSTR_FLG": "0",
+	      "BULK_PCK_FLG": "0",
+	      "CTRLFLAG": ""
+	    }
+	  }
+	]

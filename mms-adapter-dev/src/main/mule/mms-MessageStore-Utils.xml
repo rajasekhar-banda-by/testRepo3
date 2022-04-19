@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd">
+	<flow name="MessageStore-Store-FromMMS-Flow" doc:id="c326cff0-88a9-42e1-a171-33bb39489dbf" >
+		<choice doc:name="Choice" doc:id="152f1b7d-3a60-496f-b0d0-cdb173d86976" >
+			<when expression="#[('${MessageStoreService.Enable}' == 'true') and (vars.Action == 'Received')]">
+				<message-store:store-message doc:name="Store Message" doc:id="1f8f5f0d-7745-4619-b1e5-46f738d0ce72" config-ref="Message_Store_Config" endpointType="${Store.EndpointType.FromMMS.Received}" endpointName="${Store.EndpointName.FromMMS.Received}" messageCategory="${Store.MessageCategory.FromMMS.Received}" modelType="${Store.ModelType.FromMMS.Received}" messageType="#[vars.Global.FlowName]" messageNamedVersion="${Store.MessageVersion.FromMMS.Received}" messageId="#[vars.Global.FileName]" messageTimeStamp="#[now()]" messageSender="${Store.Sender.FromMMS.Received}" messageReceivers="${Store.Receivers.FromMMS.Received}" messageStatus="Received" target="MS_Store_FromMMS_Received_Ref" sourceMessageSender="${Store.Sender.FromMMS.Received}" sourceMessageId="#[vars.Global.FileName]">
+					<message-store:message-body ><![CDATA[#[%dw 2.0 
+output application/csv 
+---
+payload]]]></message-store:message-body>
+				</message-store:store-message>
+			</when>
+			<when expression="#[('${MessageStoreService.Enable}' == 'true') and (vars.Action == 'Sent')]">
+				<message-store:store-message doc:name="Store Message" doc:id="ce5d26a7-4f00-4572-a4c9-b95b0b41a2c8" config-ref="Message_Store_Config" endpointType="${Store.EndpointType.FromMMS.Sent}" endpointName="${Store.EndpointName.FromMMS.Sent}" messageCategory="${Store.MessageCategory.FromMMS.Sent}" modelType="${Store.ModelType.FromMMS.Sent}" messageType="#[vars.Global.FlowName]" messageNamedVersion="${Store.MessageVersion.FromMMS.Sent}" messageTimeStamp="#[now()]" messageSender="${Store.Sender.FromMMS.Sent}" messageReceivers="${Store.Receivers.FromMMS.Sent}" messageStatus="Sent" target="MS_Store_FromMMS_Sent_Ref" sourceMessageSender="${Store.Sender.FromMMS.Sent}" sourceMessageId="#[vars.Out_FileName]" messageId="#[vars.Out_FileName]">
+					<message-store:message-body ><![CDATA[#[%dw 2.0 
+output application/xml
+---
+payload]]]></message-store:message-body>
+
+				</message-store:store-message>
+			</when>
+			<otherwise >
+			
+				<logger level="INFO" doc:name="Logger" doc:id="41d35ddf-6917-476a-93cd-6e85e701e8ce" message="Message Store Service is Disabled. Please check the property ${MessageStoreService.Enable}"/>
+				<logger level="INFO" doc:name="Logger" doc:id="13091583-5556-4927-b5e7-5d27545601a3" message="#[payload]"/>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="MessageStore-Store-ToMMS-Flow" doc:id="45eced52-6e9a-44f7-afd2-b045b4beb1df" >
+		<choice doc:name="Choice" doc:id="7ed2c36a-2e88-4c85-9b0d-204783bac928" >
+			<when expression="#[('${MessageStoreService.Enable}' == 'true') and (vars.Action == 'Received')]">
+				<message-store:store-message doc:name="Store Message" doc:id="f9f89486-479d-4c21-8242-57dfeb3b4d08" config-ref="Message_Store_Config" endpointType="${Store.EndpointType.ToMMS.Received}" endpointName="${Store.EndpointName.ToMMS.Received}" messageCategory="${Store.MessageCategory.ToMMS.Received}" modelType="${Store.ModelType.ToMMS.Received}" messageType="#[vars.Global.FlowName]" messageNamedVersion="${Store.MessageVersion.ToMMS.Received}" messageTimeStamp="#[now()]" messageSender="${Store.Sender.ToMMS.Received}" messageReceivers="${Store.Receivers.ToMMS.Received}" messageStatus="Received" target="MS_Store_ToMMS_Received_Ref" sourceMessageSender="${Store.Sender.ToMMS.Received}" sourceMessageId="#[vars.Global.FileName]" messageDocumentId="#[vars.Global.FileName]" messageId="#[vars.Global.FileName]" sourceDocumentId="#[vars.Global.FileName]">
+				</message-store:store-message>
+			</when>
+			<when expression="#[('${MessageStoreService.Enable}' == 'true') and (vars.Action == 'Sent')]">
+				<message-store:store-message doc:name="Store Message" doc:id="ee7e2b87-a815-468a-b535-ed3050068f30" config-ref="Message_Store_Config" endpointType="${Store.EndpointType.ToMMS.Sent}" endpointName="${Store.EndpointName.ToMMS.Sent}" messageCategory="${Store.MessageCategory.ToMMS.Sent}" modelType="${Store.ModelType.ToMMS.Sent}" messageType="#[vars.Global.FlowName]" messageNamedVersion="${Store.MessageVersion.ToMMS.Sent}" messageTimeStamp="#[now()]" messageSender="${Store.Sender.ToMMS.Sent}" messageReceivers="${Store.Receivers.ToMMS.Sent}" messageStatus="Sent" target="MS_Store_ToMMS_Sent_Ref" sourceMessageSender="${Store.Sender.ToMMS.Sent}" sourceMessageId="#[vars.Out_FileName]" messageDocumentId="#[vars.Out_FileName]" messageId="#[vars.Out_FileName]" sourceDocumentId="#[vars.Out_FileName]">
+				</message-store:store-message>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="7ceb82a8-e3dd-4c35-9fac-fcc408953ef1" message="Message Store Service is Disabled. Please check the property ${MessageStoreService.Enable}"/>
+				<logger level="INFO" doc:name="Logger" doc:id="4b138f02-e9b2-43d0-bfaf-f3b8a563ecc2" message="#[payload]"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

@@ -1,0 +1,68 @@
+[
+  {
+    "WHSE_ID": {
+      "555": "CHAPTER1"
+    }
+  },
+  {
+    "HOSTMAP": {
+      "STRPRE": "S",
+      "STRZNPRE": "Z",
+      "VENDORPRE": "V",
+      "DCTODCPRE": "W",
+      "CLIENT_ID": "----",
+      "ATRTYP": "29",
+      "SUBATRTYP": "30"
+    }
+  },
+  {
+    "CTRL_SEG": {
+      "TRNNAM": "RCPT_TRAN",
+      "TRNVER": "2017.1V0"
+    }
+  },
+  {
+    "RCPT_TRLR_SEG": {
+      "SEGNAM": "RECEIPT TRAILER",
+      "CARCOD": "RCVCARRIER",
+      "TRLR_STAT": "EX",
+      "REFRIG_FLG": "0",
+      "TRLR_COD": "RCV",
+      "TURN_FLG": "0",
+      "DELV_FLG": "0"
+    }
+  },
+  {
+    "RCPT_TRUCK_SEG": {
+      "SEGNAM": "RECEIPT TRUCK",
+      "TRNSPT": "C",
+      "LBLFLG": "0",
+      "ARECOD": "EXPR",
+      "IGNORE_INV_FLG": "0",
+      "CARCOD": "RCVCARRIER"
+    }
+  },
+  {
+    "RCPT_INVOICE_SEG": {
+      "SEGNAM": "RECEIPT INVOICE",
+      "INVTYP": "XDLO",
+      "SADNUM": "X"
+    }
+  },
+  {
+    "RCPT_LINE_SEG": {
+      "SEGNAM": "RECEIPT LINE",
+      "INVSLN": "0000",
+      "PRTNUM": "LSKU-XD",
+      "RCVSTS": "A"
+    }
+  },
+  {
+    "RCPT_ASN_SEG": {
+      "SEGNAM": "RECEIPT ASN",
+      "PRTNUM": "LSKU-XD",
+      "INVSTS": "A",
+      "INVSLN": "0000"
+    }
+  }
+]

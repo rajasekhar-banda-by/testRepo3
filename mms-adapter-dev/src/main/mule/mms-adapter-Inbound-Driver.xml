@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="mms_Inbound_XML_Router" doc:id="279341c4-4aad-4f7b-9bd2-32f8e6d25951" >
+		<choice doc:name="Choice" doc:id="1f53a20e-a360-4b01-8262-747df944110a" >
+			<when expression="#[payload.MASTER_RCPT_COMPLETE_OUB_IFD.RCV_TRLR_OUB_IFD.TRANID == 'MASTER-REC']" doc:id="d3cc28bd-30fb-48d4-a140-9c9d80bc9ac7">
+				<set-variable value="#[p('Queue.Inbound.MasterReceipt')]" doc:name="MasterReceipt" doc:id="9c46888e-5efe-4b19-8b74-2202bf8de8ec" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['ASN_CANCEL_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="846f6143-f60c-47fa-9dfd-0cced8ce1fc6" variableName="xmlFileName"/>
+			</when>
+			<when expression="#[payload.SHIP_LOAD_OUB_IFD.CTRL_SEG.MOVE_SEG.TRNNAM == 'SHIP_LOAD']">
+				<set-variable value="#[p('Queue.Inbound.ShipLoad')]" doc:name="ShipLoad" doc:id="c63e652c-0871-4425-906a-6c24183f7274" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['SHIP_LOAD_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="192cf15c-17f5-40ff-8e09-d13ae3045e55" variableName="xmlFileName"/>
+			</when>
+			<when expression="#[payload.INVENTORY_RECEIPT_IFD.CTRL_SEG.TRNNAM == 'INV-RCV']">
+				<set-variable value="#[p('Queue.Inbound.InvRcpt')]" doc:name="InvRcpt" doc:id="bab89e0d-b5cd-46f8-ab1a-d688b5e12511" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['INVRCPT_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="76ed7da6-1d52-4a68-8dd7-b64de22363b5" variableName="xmlFileName"/>
+			
+			</when>
+			<when expression="#[payload.INVENTORY_STATUS_CHANGE_IFD.INVENTORY_STATUS_CHANGE_IFD_SEG != null]">
+				<set-variable doc:name="InvStsChg" doc:id="7166f9f9-1c26-400a-9ab7-73cb707674a0" variableName="MmsInbound_Queue" value="#[p('Queue.Inbound.InvStsChg')]"/>
+				<set-variable value="#['INV_STS_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="88da9820-a4f6-47ba-8708-c75acf921172" variableName="xmlFileName"/>
+			</when>
+			<when expression="#[payload.INVENTORY_ADJUST.INVENTORY_ADJUST_IFD.TRNNUM != null]">
+				<set-variable value="#[p('Queue.Inbound.InvAdj')]" doc:name="InvAdj" doc:id="24a156da-d8a9-4760-86ca-7991cd966d47" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['INV_ADJ_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="3109d5df-d072-405b-a9ac-a2bf72e99f74" variableName="xmlFileName"/>
+			</when>
+			<when expression="#[payload.INVENTORY_RECONCILIATION_IFD.CTRL_SEG.TRNNAM == 'INVENTORY RECONCILIATION']">
+				<set-variable value="#[p('Queue.Inbound.InvRecon')]" doc:name="InvRecon" doc:id="7952bdc6-19dd-49f2-963b-fad773c98714" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['INV_RECON_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="6ba7298c-1a11-4c8b-a899-c1c31b9ff026" variableName="xmlFileName"/>
+			</when>
+			<when expression="#[payload.TL_LPN_HOLD_HOST.LPN_HOLD_HOST_IFD.TRNNUM != null]">
+				<set-variable value="#[p('Queue.Inbound.InvHold')]" doc:name="InvHold" doc:id="440baa82-5b23-4e40-813d-e4dbff4d4db2" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['INV_HOLD_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="117b2ad1-53df-44ca-88c9-7d7ee9bb4bc9" variableName="xmlFileName"/>
+			</when>
+			<otherwise >
+				<set-variable value="#[p('Queue.Inbound.Default')]" doc:name="Default" doc:id="1e7343bf-977d-4f16-baa2-41f0a4f85215" variableName="MmsInbound_Queue"/>
+				<set-variable value="#['OTHER_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} ++ '.xml']" doc:name="xmlFileName" doc:id="30c78555-ac0e-471b-bc57-54f82e7fb112" variableName="xmlFileName"/>
+			</otherwise>
+		</choice>
+		<jms:publish doc:name="Publish to MMS Inbound Queue" doc:id="b4b2e281-4e29-4c05-a261-4085fc572af9" config-ref="JMS_Config" destination="#[vars.MmsInbound_Queue]">
+			<jms:message correlationId="#[vars.xmlFileName]" />
+		</jms:publish>
+	</flow>
+	
+	<flow name="mms_Inbound_Listen_InvRcpt_Queue" doc:id="74901652-728a-4e05-80fc-ccf8fbaa4785" >
+		<jms:listener doc:name="Listener" doc:id="d3e7c455-cf31-4d98-a7e2-3a04c532fab5" destination="${Queue.Inbound.InvRcpt}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="c0dd1187-43ad-44bc-9fef-735335fc169a" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_InvRcpt_Flow" doc:id="790f6f6a-ab3f-41ee-a8b0-bcdeb3a48e2f" name="Inbound_InvRcpt_Flow"/>
+	</flow>
+<flow name="mms_Inbound_Listen_Inv_Adj_Queue" doc:id="f10e7dbb-04fa-4bab-acbc-c9790ddc3f79" >
+		<jms:listener doc:name="Listener" doc:id="b13797c9-23bd-45ff-ae2c-b7f1ced645db" destination="${Queue.Inbound.InvAdj}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="9d2fbb33-8041-4b93-9f46-4fafe970888b" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_Inv_Adj_Flow" doc:id="61432a64-c9a3-4a07-a1da-5783acaf1467" name="Inbound_Inv_Adj_Flow"/>
+	</flow>
+	
+<flow name="mms_Inbound_Listen_Inv_Recon_Queue" doc:id="979057a9-0895-443b-859a-0d47fe89efd1" >
+		<jms:listener doc:name="Listener" doc:id="4f1bac70-5b45-4fca-8dd3-421c03e0f539" destination="${Queue.Inbound.InvRecon}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="7d84948b-2399-48d6-9e29-976aa9312f36" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_Inv_Reconc_Flow" doc:id="9fc77efe-fabe-4a7e-8ae4-02f0ed750864" name="Inbound_Inv_Reconc_Flow"/>
+	</flow>
+
+<flow name="mms_Inbound_Listen_Inv_Sts_Queue" doc:id="b5b43464-bdf5-4b5b-aaa6-e6ffacdf49d4" >
+		<jms:listener doc:name="Listener" doc:id="3f9d579e-6e7a-4e64-96b9-f41c1878d85c" destination="${Queue.Inbound.InvStsChg}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="007e369e-0a20-4fff-9173-d0dfe2c70d79" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_Inv_Sts_Flow" doc:id="ceedd9a6-a9ba-485f-99bc-5a5157b1a9fb" name="Inbound_Inv_Sts_Flow"/>
+	</flow>
+
+<flow name="mms_Inbound_Listen_ShipLoad_Queue" doc:id="a16f8723-f15e-4607-94b5-f1f8a958c5fa" >
+		<jms:listener doc:name="Listener" doc:id="a3d84720-2bfb-425b-90e1-8dadc1b6959f" destination="${Queue.Inbound.ShipLoad}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="763c4ed7-3ae3-439f-9710-4a4f519afa18" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_ShipLoad_Flow" doc:id="50a3cc15-cdbb-40cc-89b7-93c13235d934" name="Inbound_ShipLoad_Flow"/>
+	</flow>
+
+<flow name="mms_Inbound_Listen_InvHold_Queue" doc:id="25ded4eb-2794-44cd-8c0f-8163a7967f5a" >
+		<jms:listener doc:name="Listener" doc:id="5a164e2e-79aa-4af3-9254-eea9cf9c0726" destination="${Queue.Inbound.InvHold}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="fb76576f-486a-482d-9e20-8045b5f83094" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Inbound_InvHold_Flow" doc:id="4d4110f8-10a4-41b8-b701-5a9e47c7a14e" name="Inbound_InvHold_Flow"/>
+	</flow>
+<flow name="mms_Inbound_Listen_MasterReceipt_Queue" doc:id="23e338b8-2e3d-4df4-b881-6c44c6cb2c17" >
+		<jms:listener doc:name="Listener" doc:id="df44047e-c406-4195-82a4-feacab69ead1" config-ref="JMS_Config" destination="${Queue.Inbound.MasterReceipt}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="6942c15c-1766-4af6-be7e-dd9cb5d347cc" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var xmlFileName = attributes.headers.correlationId
+var extractArray = xmlFileName find '_'
+---
+{
+"FileName"				: xmlFileName,
+"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+//"ClientId"				: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<flow-ref doc:name="Inbound_AsnAsc_Flow" doc:id="8c7d412a-203e-4493-899a-97afe46878c4" name="Inbound_Asn_Can_Flow"/>
+	</flow>
+
+	
+</mule>

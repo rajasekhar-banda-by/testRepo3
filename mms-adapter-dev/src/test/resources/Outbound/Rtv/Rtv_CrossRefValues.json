@@ -1,0 +1,60 @@
+[
+  {
+    "WHSE_ID": {
+      "555": "CHAPTER1"
+    }
+  },
+  {
+    "HOSTMAP": {
+      "STRPRE": "S",
+      "STRZNPRE": "Z",
+      "VENDORPRE": "V",
+      "SUPPPRE": "S",
+      "DCTODCPRE": "W",
+      "CLIENT_ID": "----",
+      "ATRTYP": "29",
+      "SUBATRTYP": "30"
+    }
+  },
+  {
+    "CTRL_SEG": {
+      "TRNNAM": "ORDER_TRAN",
+      "TRNVER": "2017.1"
+    }
+  },
+  {
+    "ORDER_SEG": {
+      "SEGNAM": "ORDER",
+      "TRNTYP": "A",
+      "ORDTYP": "ZRTS",
+      "CPOTYP": "CTN",
+      "CARFLG": "1",
+      "SHIPBY": "ORDNUM",
+      "WAVE_FLG": "1",
+      "REQUIR_TMS_FLG": "0"
+    }
+  },
+  {
+    "ORDER_LINE_SEG": {
+      "SEGNAM": "ORDER_LINE",
+      "ORDSLN": "0000",
+      "RPQFLG": "0",
+      "PARFLG": "1",
+      "BCKFLG": "1",
+      "CARCOD": "LIFT",
+      "SRVLVL": "",
+      "XDKFLG": "0",
+      "SPLFLG": "0",
+      "NON_ALC_FLG": "0",
+      "INVSLN": "0000",
+      "STO_ALC_FLG": "0",
+      "DISTRO_TYP": "dt_prcpri"
+    }
+  },
+  {
+    "ORDER_LINE_SEG_SKU": {
+      "INVSTS": "A",
+      "INVSTS_PRG": "A"
+    }
+  }
+]

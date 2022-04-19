@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+<flow name="Outbound_StrInb_Control" doc:id="7f5f8cf7-2717-4328-adf7-ef4e545c31fc" >
+		<logger level="INFO" doc:name="Logger" doc:id="754f45ee-2add-44bb-b9a9-8a980881edd4" message="#['\n\t Started processing for Supplier']"/>
+		<flow-ref doc:name="getCrossRef_STORE_INB" doc:id="8105ff0f-9431-4b96-b52a-3c75b1d8e9d1" name="getCrossRef_STORE_INB"/>
+		<flow-ref doc:name="Outbound_StrInb_Process" doc:id="20aa7b14-c40c-48dd-84c9-f5a1203962e5" name="Outbound_StrInb_Process"/>
+	
+</flow>
+	<sub-flow name="Outbound_StrInb_Process" doc:id="ea69f350-2a64-42bd-aea9-cfda931b525c" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="4638eb0a-52b1-42f1-8534-8756966ff133" variableName="Action"/>
+		<file:read doc:name="Read CSV" doc:id="4e523b42-03aa-4d18-803e-1b077cc29490" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b7f6bd8c-d5ce-4729-b1c9-5d3d1b8e75a1" message="#['\n\t Input CSV Read']"/>
+		<flow-ref doc:name="Store CSV to message store " doc:id="9cb48fde-90bb-4b1b-bc8d-6bc157b3816e" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="9cf77c98-0536-4b9a-b3c6-5d2b7b6b3a90" message="#['\n\t Input CSV stored into message store']"/>
+		<set-payload value="#[%dw 2.0
+output application/json
+---
+(payload orderBy $.ASNUM groupBy $.ASNUM) pluck $]" doc:name="Set Payload" doc:id="6f638403-35c4-4daf-98bc-9eb9de97b72b" />
+		<foreach doc:name="For Each" doc:id="0468a85d-21fa-46d7-a417-418cf1a5ee64" batchSize="100">
+			<flow-ref doc:name="Outbound_StrInb_XML" doc:id="2d972aa5-43ec-4ff4-b9ff-a94086c9efc2" name="Outbound_StrInb_XML" />
+		</foreach>
+	</sub-flow>
+	<sub-flow name="Outbound_StrInb_XML" doc:id="909bb65e-f5d5-4da8-b8b5-da05451de670" >
+		<foreach doc:name="For Each" doc:id="b3aa663a-0bee-4e54-a377-153f84743a34" >
+			<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.ASNUM[0]]" doc:name="VndNum" doc:id="e5015046-31f7-44f9-8268-5ac57663b7d0" variableName="VndNum" />
+			<ee:transform doc:name="Transform Message" doc:id="30a5314f-cf68-42aa-885c-2a455b5b9f9f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml skipNullOn = 'everywhere'
+
+var DftIFD 		= vars.STORE_INB_CrossRefValues
+var LocDta		= payload
+var Warehouse	= vars.STORE_INB_CrossRefValues.WHSE_ID 
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+var client		= DftIFD."HOSTMAP"."CLIENTID"[0] default ''
+fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+// PEGD-161 - Added below line as part of this Jira
+fun getStr(Store) = StrPref[0] ++ ('000000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 5)]
+var Res1 = LocDta filter (value, idex) -> (value.AATYPE == '3')
+var Res2 = LocDta filter (value, idex) -> (value.AATYPE == '1')
+---
+{
+  STORE_INB_IFD: {
+	
+	
+	CTRL_SEG: {
+		TRNNAM :DftIFD."CNTRL_SEG"."TRANNAM"[0],
+		TRNVER :DftIFD."CNTRL_SEG"."TRANVER"[0],
+		WHSE_ID :Warehouse[0][0],	
+	
+	STORE_STAGING_LOCATION_SEG: {
+		SEGNAM:  DftIFD."STORE_STAGING_LOCATION_SEG"."SEGNAM"[0],
+		SRTSEQ:  DftIFD."STORE_STAGING_LOCATION_SEG"."SRTSEQ"[0],
+		DST_MOV_ZONE_ID:  DftIFD."STORE_STAGING_LOCATION_SEG"."DST_MOV_ZONE_ID"[0],
+		DSTLOC:  DftIFD."STORE_STAGING_LOCATION_SEG"."DSTLOC"[0],
+		SRC_BLDG_ID:  DftIFD."STORE_STAGING_LOCATION_SEG"."SRC_BLDG_ID"[0]
+		},
+	
+	STORE_SCHEDULE_SEG: {
+		SEGNAM:  DftIFD."STORE_SCHEDULE_SEG"."SEGNAM"[0],
+		ROUTE_ID:  DftIFD."STORE_SCHEDULE_SEG"."ROUTE_ID"[0],
+		BEGDAYCOD:  DftIFD."STORE_SCHEDULE_SEG"."BEGDAYCOD"[0],
+		BEGTIM:  DftIFD."STORE_SCHEDULE_SEG"."BEGTIM"[0],
+		ENDDAYCOD:  DftIFD."STORE_SCHEDULE_SEG"."ENDDAYCOD"[0],
+		ENDTIM:  DftIFD."STORE_SCHEDULE_SEG"."ENDTIM"[0],
+		STOP_SEQ:  DftIFD."STORE_SCHEDULE_SEG"."STOP_SEQ"[0]
+	},
+	STORE_PUT_TO_LOCATION_SEG: {
+		SEGNAM:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."SEGNAM"[0],
+		SRTSEQ:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."SRTSEQ"[0],
+		ARECOD:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."ARECOD"[0],
+		DEPT_COD:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."DEPT_COD"[0],
+		STOLOC:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."STOLOC"[0],
+		LODFLG:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."LODFLG"[0],
+		SUBFLG:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."SUBFLG"[0],
+		DTLFLG:  DftIFD."STORE_PUT_TO_LOCATION_SEG"."DTLFLG"[0],
+		SEGNAM:  DftIFD."STORE_PUT_TO_LOC_FIELD_SEG"."SEGNAM"[0],
+		COLNAM:  DftIFD."STORE_PUT_TO_LOC_FIELD_SEG"."COLNAM"[0],
+		COLVAL:  DftIFD."STORE_PUT_TO_LOC_FIELD_SEG"."COLVAL"[0]
+	},
+	
+	STORE_SEG: {
+		SEGNAM:  DftIFD."STORE_SEG"."SEGNAM"[0],
+//		TRNTYP:  DftIFD."STORE_SEG"."TRNTYP"[0],
+		TRNTYP :if (vars.initialLoad == 'Yes') 'A' else (if (payload[0].PCGCDE == 'U') 'C' else payload[0].PCGCDE),
+//		CSTNUM:  DftIFD."STORE_SEG"."CSTNUM"[0],
+// PEGD-161 - Commented below line as part of this Jira
+//		CSTNUM :if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+//      CSTNUM :if (payload[0].PCGCDE == 'D')  getStr(trim(payload[0].PCGKEY)[0 to 5]) else getStr(payload[0].ASNUM as String),
+        CSTNUM :if (payload[0].PCGCDE == 'D')  getVnd(trim(payload[0].PCGKEY)[0 to 5]) else getVnd(payload[0].ASNUM as String),
+//		CLIENT_ID:  DftIFD."STORE_SEG"."CLIENT_ID"[0],
+		CLIENT_ID: client,
+		PRCPRI:  DftIFD."STORE_SEG"."PRCPRI"[0],
+		STORE_TYP:  DftIFD."STORE_SEG"."STORE_TYP"[0],
+		STORE_GRP:  DftIFD."STORE_SEG"."STORE_GRP"[0],
+//		RTCUST:  DftIFD."STORE_SEG"."RTCUST"[0],
+// PEGD-161 - Commented below line as part of this Jira
+//		RTCUST: if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+//      RTCUST: if (payload[0].PCGCDE == 'D')  getStr(trim(payload[0].PCGKEY)[0 to 5]) else getStr(payload[0].ASNUM as String),
+        RTCUST: if (payload[0].PCGCDE == 'D')  getVnd(trim(payload[0].PCGKEY)[0 to 5]) else getVnd(payload[0].ASNUM as String),
+		BTCUST:  DftIFD."STORE_SEG"."BTCUST"[0],
+//		LNGDSC:  DftIFD."STORE_SEG"."LNGDSC"[0],
+// PEGD-161 - Commented below line as part of this Jira
+//		LNGDSC:  if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+//      LNGDSC:  if (payload[0].PCGCDE == 'D')  getStr(trim(payload[0].PCGKEY)[0 to 5]) else getStr(payload[0].ASNUM as String),
+        LNGDSC:  if (payload[0].PCGCDE == 'D')  getVnd(trim(payload[0].PCGKEY)[0 to 5]) else getVnd(payload[0].ASNUM as String),
+//		HOST_ADR_ID:  DftIFD."STORE_SEG"."HOST_ADR_ID"[0]
+// PEGD-161 - Commented below line as part of this Jira
+//		HOST_ADR_ID : if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+//      HOST_ADR_ID : if (payload[0].PCGCDE == 'D')  getStr(trim(payload[0].PCGKEY)[0 to 5]) else getStr(payload[0].ASNUM as String),
+        HOST_ADR_ID : if (payload[0].PCGCDE == 'D')  getVnd(trim(payload[0].PCGKEY)[0 to 5]) else getVnd(payload[0].ASNUM as String),
+	},
+	
+	
+// PEGD-161 - Commented below line as part of this Jira	
+	 (LocDta map (LocVal, Index) -> {
+	 	
+	 	ADDR_SEG: 
+	 	if (LocVal.AATYPE == '3')
+		{
+		ADRNAM:	LocVal.AANAME,
+		ADRTYP: LocVal.AATYPE,
+		ADRLN1: LocVal.AAADD1,
+		ADRLN2: LocVal.AAADD2,
+		ADRLN3: LocVal.AAADD3,
+		ADRCTY: LocVal.AACITY,
+		ADRSTC: LocVal.AASTAT,
+		ADRPSZ: LocVal.AAPSCD,
+		CTRY_NAME: LocVal.AACNTY,
+		PHNNUM: LocVal.AAPHON,
+		FAXNUM: LocVal.AAFAXN,
+		HOST_EXT_ID: getVnd(payload[0].ASNUM as String) ++ '_3'
+		}	
+		else if (LocVal.AATYPE == '1' and sizeOf(Res1) == 0)
+		{
+	    ADRNAM:	LocVal.AANAME,
+		ADRTYP: LocVal.AATYPE,
+		ADRLN1: LocVal.AAADD1,
+		ADRLN2: LocVal.AAADD2,
+		ADRLN3: LocVal.AAADD3,
+		ADRCTY: LocVal.AACITY,
+		ADRSTC: LocVal.AASTAT,
+		ADRPSZ: LocVal.AAPSCD,
+		CTRY_NAME: LocVal.AACNTY,
+		PHNNUM: LocVal.AAPHON,
+		FAXNUM: LocVal.AAFAXN,
+		HOST_EXT_ID: getVnd(payload[0].ASNUM as String) ++ '_1'
+		} else null
+	 
+	 	
+	}
+)
+
+	
+//	ADDR_SEG: {
+//		SEGNAM:  DftIFD."ADDR_SEG"."SEGNAM"[0],
+////		TRNTYP:  DftIFD."ADDR_SEG"."TRNTYP"[0],
+//		TRNTYP :if (vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+////		CLIENT_ID:  DftIFD."ADDR_SEG"."CLIENT_ID"[0],
+//		CLIENT_ID: client,
+////		ADRNAM:  DftIFD."ADDR_SEG"."ADRNAM"[0],
+//		ADRNAM:	 if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+//		ADRTYP:  DftIFD."ADDR_SEG"."ADRTYP"[0],
+////		ADRLN1:  DftIFD."ADDR_SEG"."ADRLN1"[0],
+////		ADRLN2:  DftIFD."ADDR_SEG"."ADRLN2"[0],
+////		ADRLN3:  DftIFD."ADDR_SEG"."ADRLN3"[0],
+////		ADRCTY:  DftIFD."ADDR_SEG"."ADRCTY"[0],
+////		ADRSTC:  DftIFD."ADDR_SEG"."ADRSTC"[0],
+////		ADRPSZ:  DftIFD."ADDR_SEG"."ADRPSZ"[0],
+////		CTRY_NAME:  DftIFD."ADDR_SEG"."CTRY_NAME"[0],
+////		RGNCOD:  DftIFD."ADDR_SEG"."RGNCOD"[0],
+//		ADRLN1:  LocVal.AAADD1,
+//		ADRLN2:  LocVal.AAADD2,
+//		ADRLN3:  LocVal.AAADD3,
+//		ADRCTY:  LocVal.AACITY,
+//		ADRSTC:  LocVal.AASTAT,
+//		ADRPSZ:  LocVal.AAPSCD,
+//		CTRY_NAME: LocVal.AAHOME,
+//		PHNNUM:  DftIFD."ADDR_SEG"."PHNNUM"[0],
+//		FAXNUM:  DftIFD."ADDR_SEG"."FAXNUM"[0],
+//		RSAFLG:  DftIFD."ADDR_SEG"."RSAFLG"[0],
+//		TEMP_FLG:  DftIFD."ADDR_SEG"."TEMP_FLG"[0],
+//		LAST_NAME:  DftIFD."ADDR_SEG"."LAST_NAME"[0],
+//		FIRST_NAME:  DftIFD."ADDR_SEG"."FIRST_NAME"[0],
+//		HONORIFIC:  DftIFD."ADDR_SEG"."HONORIFIC"[0],
+//		ADR_DISTRICT:  DftIFD."ADDR_SEG"."ADR_DISTRICT"[0],
+//		WEB_ADR:  DftIFD."ADDR_SEG"."WEB_ADR"[0],
+//		EMAIL_ADR:  DftIFD."ADDR_SEG"."EMAIL_ADR"[0],
+//		PAGNUM:  DftIFD."ADDR_SEG"."PAGNUM"[0],
+//		LOCALE_ID:  DftIFD."ADDR_SEG"."LOCALE_ID"[0],
+//		ATTN_NAME:  DftIFD."ADDR_SEG"."ATTN_NAME"[0],
+//		ATTN_TEL:  DftIFD."ADDR_SEG"."ATTN_TEL"[0],
+//		CONT_NAME:  DftIFD."ADDR_SEG"."CONT_NAME"[0],
+//		CONT_TEL:  DftIFD."ADDR_SEG"."CONT_TEL"[0],
+//		CONT_TITLE:  DftIFD."ADDR_SEG"."CONT_TITLE"[0],
+//		PO_BOX_FLG:  DftIFD."ADDR_SEG"."PO_BOX_FLG"[0],
+//		HOST_EXT_ID:  DftIFD."ADDR_SEG"."HOST_EXT_ID"[0]
+//	}	
+		}		
+	}
+	
+
+}
+	
+
+
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++&quot;_StrInb_Vendor_&quot;++ vars.VndNum 
+++ '_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} default ''++&quot;.xml&quot;]" doc:name="Out_FileName" doc:id="79252b7a-3317-43e6-8f25-c3b9e34ef36a" variableName="Out_FileName"/>
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="a95a444e-cab8-4736-873a-6da25b0ac6d2" variableName="Action"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="6a7f1c55-6b2c-405b-b42a-315e39bfb11c" name="MessageStore-Store-FromMMS-Flow"/>
+			<logger level="INFO" doc:name="Logger" doc:id="79387c66-b62b-4f61-b0ed-274f54de355c" message="#['\n\t stored XML into message store']"/>
+			<flow-ref doc:name="Send To Destinations" doc:id="c1971ac4-e6c2-465b-93bb-ff709c96b732" name="Outbound_Send_To_Destinations"/>
+			<logger level="INFO" doc:name="Logger" doc:id="32749c4c-1c95-4812-8467-a0251d4b30e9" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+		
+
+</foreach>
+	</sub-flow>
+	
+
+
+</mule>

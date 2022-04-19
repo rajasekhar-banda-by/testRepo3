@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd">
+	<flow name="mms_OutBound_Publish_CsvFileName_ToQueue" doc:id="43387f25-78a9-448b-a16e-12c2503324ac" >
+		<file:listener doc:id="f813fc88-af9b-4305-b58a-cccc1797a666" config-ref="MMS_In_Config" autoDelete="true">
+			<scheduling-strategy >
+				<fixed-frequency frequency="10" timeUnit="SECONDS" />
+			</scheduling-strategy>
+			<file:matcher filenamePattern="*.trg" />
+		</file:listener>
+		<ee:transform doc:name="Transform Message" doc:id="ecf57025-890d-410f-9a58-bb642b5d461b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var trgFileName = attributes.fileName
+var extractArray = trgFileName find '_'
+---
+{
+"CsvFileName"	: trgFileName[0 to sizeOf(trgFileName) - 4] ++ 'csv',
+"FlowName"		: trgFileName[0 to extractArray[0] - 1],
+//"ToQueue"		: if (trgFileName contains('GETCROSSREF')) trgFileName[0 to extractArray[0] - 1] ++ trgFileName[extractArray[1] to (extractArray[5] - 1)] 
+//					else trgFileName[0 to extractArray[4]-1],
+//"ToQueue"		: if (trgFileName contains('GETCROSSREF')) Mule::p('Queue.Outbound.GETCROSSREF') 
+//					else trgFileName[0 to extractArray[4]-1]
+
+"ToQueue"		: Mule::p('Queue.Outbound.' ++ trgFileName[0 to extractArray[0]-1] as String) 
+
+
+
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="9347b593-4605-4669-bb86-709eacd6d95b" message="#['Published the file ' ++ payload.CsvFileName as String ++ ' to the queue : ' ++ payload.ToQueue as String]" />
+		<jms:publish doc:name="Publish" doc:id="1e8db514-1daa-469d-a33e-6aa42f9d46a6" destination="#[p('Queue.Outbound.' ++ payload.FlowName)]" config-ref="JMS_Config">
+			<jms:message >
+				<jms:body ><![CDATA[#[payload.CsvFileName]]]></jms:body>
+				<jms:jmsx-properties />
+			</jms:message>
+		</jms:publish>
+	</flow>
+	<flow name="mms_OutBound_Listen_GetCrossRef_Queue" doc:id="db5ec712-1691-4dd2-ae48-32b382f54537" >
+		<jms:listener doc:name="Listener" doc:id="8cc5619d-ce55-4862-8205-5ad3ec804626" destination="${Queue.Outbound.GETCROSSREF}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="08309de8-cbbb-4286-ad7c-a17eab908912" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+//"FlowName"				: csvFileName[extractArray[0] + 1 to extractArray[1] -1],
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+//"Destination"			: csvFileName[extractArray[1] + 1 to extractArray[2] -1],
+//"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+//"ClientId"			: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="GetCrossRef" doc:id="ed1feeed-30e0-40e1-b9fe-0dcc26e9b109" name="GetCrossRef"/>
+	</flow>
+	<flow name="mms_InBound_Listen_Wms_OutBound_Queue" doc:id="c019d0d5-1176-4b55-a869-7483bacd17d3" >
+		<jms:listener doc:name="Listener" doc:id="cd6aea85-58b0-44d3-bc20-b2ee064c711b" config-ref="JMS_Config" destination="${Queue.Inbound.CHAPTER1}" inboundContentType="application/xml" inboundEncoding="UTF-8">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="d7bcc80f-4578-4084-b871-7d520bdfcd65" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+//var xmlFileName = payload
+//var extractArray = xmlFileName find '_'
+---
+{
+//"FileName"				: xmlFileName,
+//"FlowName"				: xmlFileName[extractArray[0] + 1 to extractArray[1] -1],
+//"FlowName"				: xmlFileName[0 to extractArray[0] -1],
+"FlowName"				: 'MMSInboundXML',
+//"Destination"			: xmlFileName[extractArray[1] + 1 to extractArray[2] -1],
+//"MMSInstanceName"		: xmlFileName[extractArray[2] + 1 to extractArray[3] -1],
+//"ClientId"			: xmlFileName[extractArray[3] + 1 to extractArray[4] -1],
+"MMSInstanceName"		: Mule::p('MMS.InstanceName'),
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="mms_Inbound_XML_Router" doc:id="aec55561-0427-4e67-b46b-8a2f80cd6221" name="mms_Inbound_XML_Router"/>
+	</flow>
+	</mule>

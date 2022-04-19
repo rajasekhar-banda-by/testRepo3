@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-single-po-test-suite.xml" />
+	<munit:test name="mms-wms-single-po-test-suite-Outbound_SingleLocPO_ControlTest" doc:id="fd2bed99-aedf-4635-a550-befca2433fa3" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_RCPT_SINGLE_LOC_PO" doc:id="1b10491e-9c2e-4419-bdb0-300eaa4d0755" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_RCPT_SINGLE_LOC_PO" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="PO_Single_Loc_CrossRefValues" value='#[readUrl("classpath://Outbound/PoSingleLoc/PO_Single_Loc_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read Csv" doc:id="398e16d4-9c7d-4606-a62f-665bcc61c07c" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="4e556bf7-6b21-41e8-9855-4819b4241918" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/PoSingleLoc/POSINGLELOC_OUB_WMS_QUA_WST_20210118131322313255.csv", "application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Store CSV to Message Store" doc:id="6208ac04-9b13-4991-87f6-82dd7ea3d5ca" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="MessageStore-Store-FromMMS-Flow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send To Destinations" doc:id="9f3fbf90-caee-4457-a179-cec7c7f78899" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_SingleLocPO_Control" doc:id="41edec88-2d6a-4ac4-91d2-56401a66a3d4" name="Outbound_SingleLocPO_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

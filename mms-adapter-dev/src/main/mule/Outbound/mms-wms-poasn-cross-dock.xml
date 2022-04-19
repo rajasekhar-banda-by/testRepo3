@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="Outbound_POAsn_Control" doc:id="58822533-db57-4085-96b8-dc95f2b0990b" >
+		<logger level="INFO" doc:name="Logger" doc:id="827157c4-4e25-4072-b4ef-24f627ac7454" message="#['\n\t POASN Process Started']"/>
+		<flow-ref doc:name="getCrossRef_RCPT_CROSS_DOCK" doc:id="7d7690f8-b5c8-4b80-ba24-c85e77df0092" name="getCrossRef_RCPT_CROSS_DOCK"/>
+		<flow-ref doc:name="Outbound_POAsn_Process" doc:id="47bf8fe8-e409-4df2-8ffd-ec02f8b68a46" name="Outbound_POAsn_Process"/>
+	</flow>
+	<sub-flow name="Outbound_POAsn_Process" doc:id="ce6d0603-a408-4e28-b071-82eefd37a323" >
+		<file:read doc:name="Read CSV" doc:id="d50bc075-b013-43b2-9433-e02e751c37f9" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="36b244e9-de9e-4c19-b731-cfd2bd6bcc3f" message="#['\n\t Input CSV Read']"/>
+		<set-variable value="#['Received']" doc:name="Action" doc:id="da4f1c30-9144-4948-b352-9c8b10b262a5" variableName="Action"/>
+		<flow-ref doc:name="Store CSV to Message Store" doc:id="1f1b4ac9-1d0c-4f4a-812d-838a2610e3aa" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="a3d4b853-96c5-405b-9c08-e905e269f336" message="#['\n\t Input CSV stored into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="a123226f-461a-4797-93aa-ce1bf6ae8f48" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var ASN =  (payload orderBy $.NHRUCN groupBy $.NHRUCN) pluck $
+//var ASN =  (payload orderBy $.PCGKEY groupBy $.PCGKEY) pluck $
+---
+(ASN map (Hdr,Hdrindex) ->{
+	ASHDR: 				{
+		PCGCDE : Hdr[0].PCGCDE,
+		NHSTOR : Hdr[0].NHSTOR,
+		NHRUCN : Hdr[0].NHRUCN,
+		NHCPLT : Hdr[0].NHCPLT,
+		NHCCTN : Hdr[0].NHCCTN,
+		NHCWGT : Hdr[0].NHCWGT,
+//PEGD 2215 - Modified NSHSDT and NHEXDT 
+		NHSHDT : if (Hdr[0].NHSHDT != null and Hdr[0].NHSHDT != '') Hdr[0].NHSHDT as Number else 0,
+		NHEXDT : if (Hdr[0].NHEXDT != null and Hdr[0].NHEXDT != '') Hdr[0].NHEXDT as Number else 0,
+		POCODT : Hdr[0].POCODT,
+		POMRCV : Hdr[0].POMRCV,
+		POVNUM : Hdr[0].POVNUM,
+		POORIG : Hdr[0].POORIG,
+		POLADG : Hdr[0].POLADG,
+//PEGD 2215 - Modified PORDAT 
+		PORDAT : if (Hdr[0].PORDAT != null and Hdr[0].PORDAT != '') Hdr[0].PORDAT as Number else 0,
+		PONUMB : Hdr[0].PONUMB,
+		POSHPP : Hdr[0].POSHPP  		
+		},
+	ASDTL: Hdr map (Dtl,Dtlidx) ->{
+		ADPONO:  Dtl.PONUMB,
+		ADPOBO:  Dtl.POBON,
+		NDCSHP : Dtl.NDCSHP,
+//PEGD 2215 - Modified PVNDPN  
+		PVNDPN : if (Dtl.PVNDPN != null and Dtl.PVNDPN != '') Dtl.PVNDPN as Number else 0,
+		INUMBR : Dtl.INUMBR,
+		ADVDRN : Dtl.ADVDRN,
+		DSC151 : Dtl.DSC151,		
+//Added below WPLINE as part of 5.1 version changes
+		WPLINE : Dtl.WPLINE,
+//PEGD 669 Added the field CTYORG
+		CTYORG : Dtl.CTYORG
+	}
+} 
+)
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="dbe8fbd3-a1fb-4b53-b2c8-9320843ccf4f" >
+			<when expression="#[sizeOf(payload) !=0]">
+				<flow-ref doc:name="Outbound_POAsn_Batch" doc:id="bdd6beaa-0109-4501-8e16-6b0836e7f4c2" name="Outbound_POAsn_Batch" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="bfcf72df-c63e-4413-babd-c9d3a9664746" message="#['\n\t Process Completed. No Payload to Process']"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<flow name="Outbound_POAsn_Batch" doc:id="8bc4dd00-0daa-4c9b-bde0-b5e7b2a0657e">
+		<batch:job jobName="mms-wms-poasn-cross-dockBatch_Job" doc:id="239a6045-4dc8-4938-adba-04c0ba35dcbb" maxFailedRecords="-1" blockSize="10">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="9876b1a6-cc89-4a64-b655-a22e8b0fe04e" >
+					<flow-ref doc:name="Outbound_POAsn_genXML" doc:id="4bb2643e-1695-4bb6-8913-de597804e7cb" name="Outbound_POAsn_genXML"/>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+	</flow>
+	<sub-flow name="Outbound_POAsn_genXML" doc:id="0e4d0efd-fe32-4201-810f-47a6b2aa543d">
+		<try doc:name="Try" doc:id="a8717687-687f-4a5e-b42a-5dd3c0c21a33">
+					<set-variable value="#[payload.ASHDR]" doc:name="ASHDR" doc:id="fd88e82e-bd05-4636-82ab-070fc6f7b55c" variableName="ASHDR" />
+		<set-variable value="#[payload.ASDTL]" doc:name="ASDTL" doc:id="96e911a4-4d34-4ea0-b81d-aac6bbaa17d6" variableName="ASDTL" />
+			<ee:transform doc:name="Transform Message" doc:id="9d38710f-00db-4eb3-b565-5acf936cd89f">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+
+var DftIFD = vars.PO_ASN_CrossDock_CrossRefValues
+var StrPref = DftIFD."HOSTMAP"."STRPRE" default ''
+//var MyList1 = (vars.ASDTL orderBy $.ADSTR orderBy $.ADPLPN groupBy ($.ADSTR as String ++ $.ADSKU as String) ) pluck $
+var MyList2 = (vars.ASDTL orderBy $.PVNDPN groupBy $.PVNDPN) pluck $
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+
+---
+
+{
+/*Group By for Line SKU segment */
+RCPT_LINE_SKU: (MyList2) map {
+				     			ADPONO : $[0].ADPONO,
+				     			ADBONO : $[0].ADBONO,
+				     			PVNDPN : $[0].PVNDPN,
+				     			INUMBR : $[0].INUMBR,
+//								LineNum: ($$ + 1) * 10,
+								NDCSHP : sum($..NDCSHP),
+//Added below WPLINE as part of 5.1 version changes
+								WPLINE : $[0].WPLINE,
+//PEGD 669 Added the field CTYORG
+								CTYORG : $[0].CTYORG,						
+				         	 } orderBy $.PVNDPN,
+				         	 
+///*Group By for ASN SKU segment */
+//RCPT_ASN_SKU: (MyList1) map {
+//				     			ADPONO : $[0].ADPONO,
+//				     			ADBONO : $[0].ADBONO,
+//								ADSTR  : getStr($[0].ADSTR as String),
+//								ADSKU  : $[0].ADSKU,
+//								ADPOLN : $[0].ADPOLN * 10,
+//								EXPQTY : sum($..ADEQTY),
+//								ADPLPN : $[0].ADPLPN
+//								
+//				         	 } 	orderBy $.ADSKU	orderBy $.ADSTR
+//
+
+}	
+
+		
+	
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<ee:transform doc:name="mapping" doc:id="8c73cf06-951e-440b-8851-af8afbd3478f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml  skipNullOn='everywhere'
+var DftIFD 		= vars.PO_ASN_CrossDock_CrossRefValues
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+var PDPOPref	= DftIFD."HOSTMAP"."PDPOPRE" default ''
+var wareHouse 	= vars.ASHDR.NHSTOR as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+//var POChar		= vars.ASHDR.NHPONO as String
+//var POpaded		= ('000000000000000' ++ POChar)[sizeOf(POChar) to (sizeOf(POChar) + 14)]
+//var TrukDtl		= 'TRK' ++ 'PO' ++ POChar
+fun DateConv (date6) = date6 + 20000000
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+---
+{
+	RCPT_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+//			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0], PEGD 2215
+            WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0] default 'CHAPTER1',
+			RCPT_TRUCK_SEG: {
+				SEGNAM: DftIFD."RCPT_TRUCK_SEG"."SEGNAM"[0],
+				TRNTYP: if (vars.ASHDR.PCGCDE == 'U') 'C' else vars.ASHDR.PCGCDE,  /*Pending */
+//				TRKNUM: TrukDtl,
+				TRKNUM: vars.ASHDR.NHRUCN as Number,
+				TRKREF: DftIFD."RCPT_TRUCK_SEG"."TRKREF"[0],
+				TRKSTS: DftIFD."RCPT_TRUCK_SEG"."TRKSTS"[0],
+				TRNSPT: DftIFD."RCPT_TRUCK_SEG"."TRNSPT"[0],
+//				NUMPAL: DftIFD."RCPT_TRUCK_SEG"."NUMPAL"[0],
+				NUMPAL: vars.ASHDR.NHCPLT,
+//				NUMCAS: DftIFD."RCPT_TRUCK_SEG"."NUMCAS"[0],
+				NUMCAS: vars.ASHDR.NHCCTN,
+//				GRSWGT: DftIFD."RCPT_TRUCK_SEG"."GRSWGT"[0],
+				GRSWGT: vars.ASHDR.NHCWGT,
+				FRTCST: DftIFD."RCPT_TRUCK_SEG"."FRTCST"[0],
+//				SHPDTE: DftIFD."RCPT_TRUCK_SEG"."SHPDTE"[0],
+				SHPDTE: if (vars.ASHDR.NHSHDT != 0) DateConv(vars.ASHDR.NHSHDT) as String ++ '000000' else null,
+//				EXPDTE: if (vars.ASHDR.AHEXDT != 0) DateConv(vars.ASHDR.AHEXDT) as String ++ '000000' else null,
+				EXPDTE: if (vars.ASHDR.NHEXDT != 0) DateConv(vars.ASHDR.NHEXDT) as String ++ '000000' else null,
+				ARRDTE: DftIFD."RCPT_TRUCK_SEG"."ARRDTE"[0],
+				RCVDCK: DftIFD."RCPT_TRUCK_SEG"."RCVDCK"[0],
+				DEVCOD: DftIFD."RCPT_TRUCK_SEG"."DEVCOD"[0],
+				LBLFLG: DftIFD."RCPT_TRUCK_SEG"."LBLFLG"[0],
+//				ARECOD: "EXPR" ++ client,
+				ARECOD: DftIFD."RCPT_TRUCK_SEG"."ARECOD"[0],
+				IGNORE_INV_FLG: DftIFD."RCPT_TRUCK_SEG"."IGNORE_INV_FLG"[0],
+				CARCOD: DftIFD."RCPT_TRUCK_SEG"."CARCOD"[0],
+//				CRNCY_CODE: DftIFD."RCPT_TRUCK_SEG"."CRNCY_CODE"[0],
+				CRNCY_CODE: vars.ASHDR.POCODT,
+				TMS_LOAD_ID: DftIFD."RCPT_TRUCK_SEG"."TMS_LOAD_ID"[0],
+				TMS_STOP_SEQ: DftIFD."RCPT_TRUCK_SEG"."TMS_STOP_SEQ"[0]
+			},
+			RCPT_INVOICE_SEG: {
+				SEGNAM: DftIFD."RCPT_INVOICE_SEG"."SEGNAM"[0],
+				TRNTYP: if (vars.ASHDR.PCGCDE == 'U') 'C' else vars.ASHDR.PCGCDE, /*Pending */
+				INVNUM: vars.ASHDR.POMRCV,
+				SUPNUM: getVnd(vars.ASHDR.POVNUM as String),
+				CLIENT_ID: client,
+//				INVTYP: DftIFD."RCPT_INVOICE_SEG"."INVTYP"[0], /*Pending */
+				INVTYP: vars.ASHDR.POORIG,
+				SADNUM: DftIFD."RCPT_INVOICE_SEG"."SADNUM"[0],
+//				WAYBILL: DftIFD."RCPT_INVOICE_SEG"."WAYBILL"[0],
+				WAYBIL: vars.ASHDR.POLADG,
+//				INVDTE: DftIFD."RCPT_INVOICE_SEG"."INVDTE"[0],		/*Pending - Use WMSCHG date */
+				INVDTE: if (vars.ASHDR.PORDAT != 0) DateConv(vars.ASHDR.PORDAT) as String ++ '000000' else null,
+				ORGREF: DftIFD."RCPT_INVOICE_SEG"."ORGREF"[0],
+				SRC_HOST: DftIFD."RCPT_INVOICE_SEG"."SRC_HOST"[0],
+				SRC_PORT: DftIFD."RCPT_INVOICE_SEG"."SRC_PORT"[0],
+				SHIP_ID: DftIFD."RCPT_INVOICE_SEG"."SHIP_ID"[0],
+//				DOC_NUM: DftIFD."RCPT_INVOICE_SEG"."DOC_NUM"[0], PEGD 2251 
+                DOC_NUM: vars.ASHDR.POLADG,
+				TRACK_NUM: DftIFD."RCPT_INVOICE_SEG"."TRACK_NUM"[0],
+//				TRKNUM: TrukDtl,
+				TRKNUM: vars.ASHDR.NHRUCN,
+//				PO_NUM: DftIFD."RCPT_INVOICE_SEG"."PO_NUM"[0],
+				PO_NUM: vars.ASHDR.PONUMB,
+				
+				/* Write all SKU details */
+				(payload.RCPT_LINE_SKU map (val,idx) -> {
+					RCPT_LINE_SEG: {
+						SEGNAM:   DftIFD."RCPT_LINE_SEG"."SEGNAM"[0],
+						TRNTYP:   if (vars.ASHDR.PCGCDE == 'U') 'C' else vars.ASHDR.PCGCDE,									/*Pending */
+//						INVLIN:   val.ADPOLN,
+//						INVLIN:   val.LineNum,
+//						INVLIN:   10 * (idx + 1),
+//                      Commented below INVLIN as part of 5.1 version changes
+//						INVLIN:   val.INUMBR,
+                        INVLIN:   val.WPLINE,
+						INVSLN:   DftIFD."RCPT_LINE_SEG"."INVSLN"[0],
+						EXPQTY:   val.NDCSHP,
+						PRTNUM:   val.PVNDPN,
+						ORGCOD:   DftIFD."RCPT_LINE_SEG"."ORGCOD"[0],
+						REVLVL:   DftIFD."RCPT_LINE_SEG"."REVLVL"[0],
+						LOTNUM:   DftIFD."RCPT_LINE_SEG"."LOTNUM"[0],
+						SUP_LOTNUM:   DftIFD."RCPT_LINE_SEG"."SUP_LOTNUM"[0],
+//						RCVSTS:   DftIFD."RCPT_LINE_SEG"."RCVSTS"[0],
+						RCVSTS:   if (vars.ASHDR.POSHPP == 'SL01') 'I' else 'A',
+						FRHSTA:   DftIFD."RCPT_LINE_SEG"."FRHSTA"[0],
+						TOHSTA:   DftIFD."RCPT_LINE_SEG"."TOHSTA"[0],
+						HSTTRN:   DftIFD."RCPT_LINE_SEG"."HSTTRN"[0],
+						MANDTE:   DftIFD."RCPT_LINE_SEG"."MANDTE"[0],
+						RETCOD:   DftIFD."RCPT_LINE_SEG"."RETCOD"[0],
+						EDTFLG:   DftIFD."RCPT_LINE_SEG"."EDTFLG"[0],
+						EXP_CATCH_QTY:   DftIFD."RCPT_LINE_SEG"."EXP_CATCH_QTY"[0],
+						SHIP_LINE_ID:   DftIFD."RCPT_LINE_SEG"."SHIP_LINE_ID"[0],
+						CNSG_FLG:   DftIFD."RCPT_LINE_SEG"."CNSG_FLG"[0],
+						PRT_CLIENT_ID: client,
+						MANDTE_FMT:   DftIFD."RCPT_LINE_SEG"."MANDTE_FMT"[0],
+						MANDTE_FMTVAL:   DftIFD."RCPT_LINE_SEG"."MANDTE_FMTVAL"[0],
+						EXPIRE_DTE:   DftIFD."RCPT_LINE_SEG"."EXPIRE_DTE"[0],
+						EXPIRE_DTE_FMT:   DftIFD."RCPT_LINE_SEG"."EXPIRE_DTE_FMT"[0],
+						EXPIRE_DTE_FMTVAL:   DftIFD."RCPT_LINE_SEG"."EXPIRE_DTE_FMTVAL"[0],
+						DISTRO_OVRFLG:   DftIFD."RCPT_LINE_SEG"."DISTRO_OVRFLG"[0],
+						INV_ATTR_STR1:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR1"[0],
+						INV_ATTR_STR2:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR2"[0],
+						INV_ATTR_STR3:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR3"[0],
+						INV_ATTR_STR4:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR4"[0],
+						INV_ATTR_STR5:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR5"[0],
+						INV_ATTR_STR6:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR6"[0],
+						INV_ATTR_STR7:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR7"[0],
+						INV_ATTR_STR8:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR8"[0],
+						INV_ATTR_STR9:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR9"[0],
+						INV_ATTR_STR10:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR10"[0],
+						INV_ATTR_STR11:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR11"[0],
+						INV_ATTR_STR12:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR12"[0],
+						INV_ATTR_STR13:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR13"[0],
+						INV_ATTR_STR14:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR14"[0],
+						INV_ATTR_STR15:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR15"[0],
+						INV_ATTR_STR16:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR16"[0],
+						INV_ATTR_STR17:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR17"[0],
+						INV_ATTR_STR18:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_STR18"[0],
+						INV_ATTR_INT1:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_INT1"[0],
+						INV_ATTR_INT2:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_INT2"[0],
+						INV_ATTR_INT3:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_INT3"[0],
+						INV_ATTR_INT4:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_INT4"[0],
+						INV_ATTR_INT5:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_INT5"[0],
+						INV_ATTR_FLT1:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_FLT1"[0],
+						INV_ATTR_FLT2:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_FLT2"[0],
+						INV_ATTR_FLT3:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_FLT3"[0],
+						INV_ATTR_DTE1:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE1"[0],
+						INV_ATTR_DTE1_FMT:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE1_FMT"[0],
+						INV_ATTR_DTE1_FMTVAL:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE1_FMTVAL"[0],
+						INV_ATTR_DTE2:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE2"[0],
+						INV_ATTR_DTE2_FMT:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE2_FMT"[0],
+						INV_ATTR_DTE2_FMTVAL:   DftIFD."RCPT_LINE_SEG"."INV_ATTR_DTE2_FMTVAL"[0],
+						CSTMS_CNSGNMNT_ID:   DftIFD."RCPT_LINE_SEG"."CSTMS_CNSGNMNT_ID"[0],
+						RCPT_TRKNUM:  vars.ASHDR.NHRUCN,
+//PEGD 669 Added the field ORGCPD
+						ORGCPD: if (val.CTYORG !='') val.CTYORG else ''
+						} 
+						})
+					
+					}	
+			}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[%dw 2.0 output application/json
+---
+vars.Global.MMSInstanceName ++ '_ASN_PO_' ++ trim(vars.ASHDR.NHRUCN) default '' ++ '_' 
+++ trim(vars.ASHDR.PONUMB) default '' ++ '_' ++ (now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;}) ++ '.xml']" doc:name="Out_FileName" doc:id="efc854ac-21c8-4850-a692-8a7f57593687" variableName="Out_FileName" />
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.RCPT_INB_IFD.CTRL_SEG.WHSE_ID default 'CHAPTER1']" doc:name="WMS_Instance" doc:id="2d756891-3ab3-410e-9d81-8ca7702793c2" variableName="WMS_Instance" />
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="cb0b5046-b9f6-4af0-8641-f41fcb7eba5e" variableName="Action" />
+			<flow-ref doc:name="Store XML to Message Store" doc:id="70044999-32ca-404e-b8e2-2b4bb00afea8" name="MessageStore-Store-FromMMS-Flow" />
+			<logger level="INFO" doc:name="Logger" doc:id="e585fe99-32c9-4e4f-9433-3e5c6c2b3320" message="#['\n\t Stored XML file to Message Store']"/>
+			<jms:publish doc:name="Publish" doc:id="cf2366f6-b5b6-478d-8737-6bb09f13bb38" config-ref="JMS_Config" destination="#[p('Queue.Outbound.' ++ vars.WMS_Instance)]" persistentDelivery="true" timeToLive="${JMSBroker.TimetoLive}" timeToLiveUnit="DAYS"/>
+			<logger level="INFO" doc:name="Logger" doc:id="1cce1ebc-8f00-4929-a4cd-46fe7caf82b3" message="#[vars.Out_FileName ++ 'Published to the Queue']" />
+			<error-handler>
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="bfe2ce70-3313-4204-a85d-7caa17e020e8">
+					<flow-ref doc:name="GenErrorReport" doc:id="5ee0c3f9-b4ee-4e29-8c83-3b5d7df3b7c5" name="GenErrorReport" />
+				</on-error-continue>
+			</error-handler>
+			
+		</try>
+	</sub-flow>
+</mule>

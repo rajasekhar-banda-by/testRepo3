@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-sku-test-suite.xml" />
+	<munit:test name="mms-wms-sku-test-suite-Outbound_SkuFlow_ControlTest" doc:id="93550b6f-4cfa-4f3b-ba99-cedcd7a40969" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_PART_INB" doc:id="ac4e1253-b744-4a91-a770-bc3ae99e970c" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_PART_INB" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="PART_INB_CrossRefValues" value='#[readUrl("classpath://Outbound/Sku/PART_INB_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read" doc:id="0a4785cc-5e55-4d9b-aeeb-36224ba54d10" processor="file:read">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute whereValue="Read" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="dd39e409-84f3-452c-9d2f-cf4d86e3f6f9" attributeName="doc:id" />
+					<munit-tools:with-attribute whereValue="MMS_In_Config" attributeName="config-ref" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/Sku/SKU_OUB_WMS_QUA_WST_20201222175042493756.csv","application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="MessageStore-Store-FromMMS-Flow" doc:id="2c46b54a-1593-4472-ab30-80f4dc8a4ab8" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Store CSV to messageStore" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send To Destinations" doc:id="7014cd38-3e79-4107-b217-99f71e4889c8" processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute whereValue="Send To Destinations" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="8a73346c-5b23-436d-b28c-3fe24c6b3baa" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_SkuFlow_Control" doc:id="60455dd4-25f8-437c-966b-e8280fde3b88" name="Outbound_SkuFlow_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

@@ -1,0 +1,49 @@
+[
+  {
+    "WHSE_ID": {
+      "555": "CHAPTER1"
+    }
+  },
+  {
+    "HOSTMAP": {
+      "STRPRE": "S",
+      "STRZNPRE": "Z",
+      "VENDORPRE": "V",
+      "DCTODCPRE": "W",
+      "CLIENTID": "----"
+    }
+  },
+  {
+    "CNTRL_SEG": {
+      
+    }
+  },
+  {
+    "STORE_STAGING_LOCATION_SEG": {
+      
+    }
+  },
+  {
+    "STORE_SCHEDULE_SEG": {
+      
+    }
+  },
+  {
+    "STORE_PUT_TO_LOCATION_SEG": {
+      
+    }
+  },
+  {
+    "STORE_SEG": {
+      "SEGNAM": "STORE",
+      "PRCPRI": "5"
+    }
+  },
+  {
+    "ADDR_SEG": {
+      "SEGNAM": "ADDR_SEG",
+      "ADRTYP": "1",
+      "ADRLN1": "1"
+    }
+  }
+]

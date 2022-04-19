@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+<flow name="Outbound_Sup_Control" doc:id="66a9e741-e11f-4edb-b89f-0ba36c40f57b" >
+		<logger level="INFO" doc:name="Logger" doc:id="7a0aed07-8293-43f6-9af6-7f3aea31879a" message="#['\n\t Started processing for Supplier']"/>
+		<flow-ref doc:name="getCrossRef_CUST_INB" doc:id="dcc59a19-c418-4dba-8ae3-0c54c330c80b" name="getCrossRef_CUST_INB"/>
+		<flow-ref doc:name="getCrossRef_SUPP_INB" doc:id="8c5e7376-c35d-4af1-94c9-d0cd05093557" name="getCrossRef_SUPP_INB"/>
+		<flow-ref doc:name="Outbound_Sup_Process" doc:id="a3eca7da-14d3-4761-9543-3c7eb4ccc095" name="Outbound_Sup_Process"/>
+	</flow>
+	<sub-flow name="Outbound_Sup_Process" doc:id="15f02808-f494-437d-bee6-1ef38d2cb600" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="c0126c5e-c191-4c39-af30-6c40f9abedc4" variableName="Action"/>
+		<file:read doc:name="Read CSV" doc:id="39b1738a-9d01-45b6-93cd-9c32af96785c" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="0fd5ca72-48dd-4fd1-aef9-acace34ba4e0" message="#['\n\t Input CSV Read']"/>
+		<flow-ref doc:name="Store CSV to message store " doc:id="64932a3a-2350-422e-b054-4967fe938ce6" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="cb0cd3a9-bd9a-40b8-80ed-78b28e833342" message="#['\n\t Input CSV stored into message store']"/>
+		<set-payload value="#[%dw 2.0
+output application/json
+---
+(payload orderBy $.ASNUM groupBy $.ASNUM) pluck $]" doc:name="Set Payload" doc:id="ff4cb6d9-8a4a-4276-951a-18dbc52e041d" />
+		<foreach doc:name="For Each" doc:id="4b963f4f-6a78-4297-b526-8f020d5821e6" batchSize="100">
+			<async doc:name="Async" doc:id="9fa54993-f883-4a4a-aed1-8cf42974f8dd">
+			<flow-ref doc:name="Outbound_Sup_CustXML" doc:id="d4bdae47-8307-4a44-901f-13aabe93f04f" name="Outbound_Sup_CustXML" />
+		</async>
+			<async doc:name="Async" doc:id="1e1b920f-80ea-463f-b956-0ccdc2e0412a">
+			<flow-ref doc:name="Outbound_Sup_SuppXML" doc:id="8f2e816b-f814-47a9-9a72-05e0e50cb905" name="Outbound_Sup_SuppXML" />
+		</async>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="Outbound_Sup_CustXML" doc:id="21d81b0b-61cf-4fb4-ac01-c7d6acb7fe2b" >
+		<foreach doc:name="For Each" doc:id="95fb4461-9bc6-46f9-875c-fcaa52ae90d7" >
+			<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.ASNUM[0]]" doc:name="VndNum" doc:id="a1f0865c-dede-4757-b84f-e91a2bac63db" variableName="VndNum" />
+			<ee:transform doc:name="Transform Message" doc:id="03e0c87a-48a3-403c-b77d-ed4cec79f974">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml skipNullOn = 'everywhere'
+var DftIFD 		= vars.CUST_INB_CrossRefValues
+var LocDta		= payload
+var Warehouse	= vars.CUST_INB_CrossRefValues.WHSE_ID
+var client		= DftIFD."HOSTMAP"."CLIENTID"[0] default ''
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+/* PEGD-161 HOST_EXT_ID field changes, added Res1 and Res2 */
+var Res1 = LocDta filter (value, idex) -> (value.AATYPE == '3')
+var Res2 = LocDta filter (value, idex) -> (value.AATYPE == '1')
+---
+{
+   CUST_INB_IFD:{
+
+	(LocDta map (LocVal, Index) -> {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CNTRL_SEG"."TRANNAM"[0],
+			TRNVER: DftIFD."CNTRL_SEG"."TRANVER"[0],
+			WHSE_ID: Warehouse[0][0],
+//			WHSE_ID :vars.WMS_Instance,
+			
+			ADDR_SEG: 
+			{
+				SEGNAM :DftIFD."ADDR_SEG"."SEGNAM"[0],
+				TRNTYP : if (vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+				CLIENT_ID :client,
+//PEGD-161		HOST_EXT_ID : if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+                HOST_EXT_ID : if (LocVal.AATYPE == '3')  getVnd(LocVal.ASNUM as String) ++ '_3' else if (LocVal.AATYPE == '1' and sizeOf(Res1) == 0)  getVnd(LocVal.ASNUM as String) ++ '_1' else null,
+				ADRNAM :LocVal.ASNAME,
+				ADRTYP :DftIFD."ADDR_SEG"."ADRTYP"[0],
+				ADRLN1 :LocVal.AAADD1,
+				ADRLN2 :LocVal.AAADD2,
+				ADRLN3 :LocVal.AAADD3,
+				ADRCTY :LocVal.AACITY,
+				ADRSTC :LocVal.AASTAT,
+				ADRPSZ :LocVal.AAPSCD default 0 as String,
+//				CTRY_NAME :DftIFD."ADDR_SEG"."CTRY_NAME"[0],
+// Use APADDR.AAHOME for county
+				CTRY_NAME :LocVal.AAHOME,				
+				RGNCOD :DftIFD."ADDR_SEG"."RGNCOD"[0],
+				PHNNUM :LocVal.AAPHON default 0 as String,
+				FAXNUM :LocVal.AAFAXN default 0 as String,
+				RSAFLG :DftIFD."ADDR_SEG"."RSAFLG"[0],
+				TEMP_FLG :DftIFD."ADDR_SEG"."TEMP_FLG"[0],
+//				LAST_NAME :DftIFD."ADDR_SEG"."LAST_NAME"[0],
+//				FIRST_NAME :DftIFD."ADDR_SEG"."FIRST_NAME"[0],
+				LAST_NAME :LocVal.ASNAME,
+				FIRST_NAME :LocVal.ASNAME,
+				HONORIFIC :DftIFD."ADDR_SEG"."HONORIFIC"[0],
+				ADR_DISTRICT :DftIFD."ADDR_SEG"."ADR_DISTRICT"[0],
+				WEB_ADR :LocVal.AAWADD,
+				EMAIL_ADR :LocVal.AAEMAL,
+				PAGNUM :DftIFD."ADDR_SEG"."PAGNUM"[0],
+				LOCALE_ID :DftIFD."ADDR_SEG"."LOCALE_ID"[0],
+				ATTN_NAME :DftIFD."ADDR_SEG"."ATTN_NAME"[0],
+				ATTN_TEL :DftIFD."ADDR_SEG"."ATTN_TEL"[0],
+				CONT_NAME :DftIFD."ADDR_SEG"."CONT_NAME"[0],
+				CONT_TEL :DftIFD."ADDR_SEG"."CONT_TEL"[0],
+				CONT_TITLE :DftIFD."ADDR_SEG"."CONT_TITLE"[0],
+				PO_BOX_FLG :DftIFD."ADDR_SEG"."PO_BOX_FLG"[0]
+			},
+			CUST_SEG: {
+				SEGNAM :DftIFD."CUST_SEG"."SEGNAM"[0],
+				TRNTYP :if (vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+				CSTNUM :if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+				CLIENT_ID :client,
+				BCKFLG :DftIFD."CUST_SEG"."BCKFLG"[0],
+				PARFLG :DftIFD."CUST_SEG"."PARFLG"[0],
+				CARFLG :DftIFD."CUST_SEG"."CARFLG"[0],
+				SPLFLG :DftIFD."CUST_SEG"."SPLFLG"[0],
+				STDFLG :DftIFD."CUST_SEG"."STDFLG"[0],
+				SHPLBL :DftIFD."CUST_SEG"."SHPLBL"[0],
+				SHIPBY :DftIFD."CUST_SEG"."SHIPBY"[0],
+				WAYBBY :DftIFD."CUST_SEG"."WAYBBY"[0],
+				CARGRP :DftIFD."CUST_SEG"."CARGRP"[0],
+				MANFID :DftIFD."CUST_SEG"."MANFID"[0],
+				DEPTNO :DftIFD."CUST_SEG"."DEPTNO"[0],
+				LOCALE_ID :DftIFD."CUST_SEG"."LOCALE_ID"[0],
+				ORDINV :DftIFD."CUST_SEG"."ORDINV"[0],
+				CSTTYP : DftIFD."CUST_SEG"."CSTTYP"."CSTTYP"."VENDOR"[0],
+				INVSTS_PRG :DftIFD."CUST_SEG"."INVSTS_PRG"[0],
+				FRSCOD :DftIFD."CUST_SEG"."FRSCOD"[0],
+				MIN_SHELF_HRS :DftIFD."CUST_SEG"."MIN_SHELF_HRS"[0],
+				RSVPRI :DftIFD."CUST_SEG"."RSVPRI"[0],
+				REQUIR_TMS_COD :DftIFD."CUST_SEG"."REQUIR_TMS_COD"[0],
+				PLTBLD_CONSBY :DftIFD."CUST_SEG"."PLTBLD_CONSBY"[0],
+				LOD_TAG_SNGLE_ENCODE :DftIFD."CUST_SEG"."LOD_TAG_SNGLE_ENCODE"[0],
+				LOD_TAG_MIX_ENCODE :DftIFD."CUST_SEG"."LOD_TAG_MIX_ENCODE"[0],
+				SUB_TAG_SNGLE_ENCODE :DftIFD."CUST_SEG"."SUB_TAG_SNGLE_ENCODE"[0],
+				SUB_TAG_MIX_ENCODE :DftIFD."CUST_SEG"."SUB_TAG_MIX_ENCODE"[0],
+				URN_FORMAT :DftIFD."CUST_SEG"."URN_FORMAT"[0],
+				ALC_SEARCH_PATH :DftIFD."CUST_SEG"."ALC_SEARCH_PATH"[0],
+				ABS_ORDINV_WIN :DftIFD."CUST_SEG"."ABS_ORDINV_WIN"[0],
+				ABS_ORDINV_CODE :DftIFD."CUST_SEG"."ABS_ORDINV_CODE"[0],
+				LOAD_ATTR1_CFG :DftIFD."CUST_SEG"."LOAD_ATTR1_CFG"[0],
+				LOAD_ATTR2_CFG :DftIFD."CUST_SEG"."LOAD_ATTR2_CFG"[0],
+				LOAD_ATTR3_CFG :DftIFD."CUST_SEG"."LOAD_ATTR3_CFG"[0],
+				LOAD_ATTR4_CFG :DftIFD."CUST_SEG"."LOAD_ATTR4_CFG"[0],
+				LOAD_ATTR5_CFG :DftIFD."CUST_SEG"."LOAD_ATTR5_CFG"[0]
+				}
+			}				
+		}
+		)	
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++&quot;_Cust_Vendor_&quot;++ vars.VndNum ++ '_' 
+++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} default ''++&quot;.xml&quot;]" doc:name="Out_FileName" doc:id="e74714ea-95c0-4f79-ac1e-21e8675f9baf" variableName="Out_FileName" />
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="378c064f-3bf8-4902-8c41-c81b4cc3d4c8" variableName="Action" />
+			<flow-ref doc:name="Store XML to Message Store" doc:id="026dc26d-b17a-43ad-83f8-9374da0f00a4" name="MessageStore-Store-FromMMS-Flow" />
+			<logger level="INFO" doc:name="Logger" doc:id="d7feb9f0-e107-4848-9fd9-35f2f90fe117" message="#['\n\t stored Customer XML into message store']"/>
+			<flow-ref doc:name="Send to Destinations" doc:id="b4e38642-3e23-4543-b8b5-e094ede5b013" name="Outbound_Send_To_Destinations" />
+			<logger level="INFO" doc:name="Logger" doc:id="6de974a6-bc29-4b48-b17d-fc41308590a1" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+		
+</foreach>
+	</sub-flow>
+	<sub-flow name="Outbound_Sup_SuppXML" doc:id="6a54aea1-f8a6-4992-b368-02b8ae4fbf9d" >
+		<foreach doc:name="For Each" doc:id="ac2d3bc4-5171-45de-893c-cc8068cbbb1c" >
+			<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.ASNUM[0]]" doc:name="VndNum" doc:id="2f26d5bd-1ea4-4083-8fa9-79def2afbeba" variableName="VndNum" />
+			<ee:transform doc:name="Transform Message" doc:id="e0415296-4fd0-46f3-840d-2b145963a5f7" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml skipNullOn = 'everywhere'
+
+var DftIFD 		= vars.SUPP_INB_CrossRefValues
+var LocDta		= payload
+var Warehouse	= vars.SUPP_INB_CrossRefValues.WHSE_ID 
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+var client		= DftIFD."HOSTMAP"."CLIENTID"[0] default ''
+fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+/* PEGD-161 HOST_EXT_ID field changes, added Res1 and Res2 */
+var Res1 = LocDta filter (value, idex) -> (value.AATYPE == '3')
+var Res2 = LocDta filter (value, idex) -> (value.AATYPE == '1')
+---
+{
+  SUPP_INB_IFD: {
+	
+	(LocDta map (LocVal, Index) -> {
+	CTRL_SEG: {
+		TRNNAM :DftIFD."CNTRL_SEG"."TRANNAM"[0],
+		TRNVER :DftIFD."CNTRL_SEG"."TRANVER"[0],
+//		WHSE_ID :Warehouse[0][0],
+		WHSE_ID :vars.WMS_Instance,	
+	
+		SUPP_SEG: {
+			SEGNAM :DftIFD."SUPP_SEG"."SEGNAM"[0],
+			TRNTYP :if (vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+			SUPNUM :if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+			CLIENT_ID :client,
+//PEGD-161	HOST_EXT_ID :if (LocVal.PCGCDE == 'D')  getVnd(trim(LocVal.PCGKEY)[0 to 5]) else getVnd(LocVal.ASNUM as String),
+            HOST_EXT_ID : if (LocVal.AATYPE == '1')  getVnd(LocVal.ASNUM as String) ++ '_1' else null,
+			ADRNAM :LocVal.ASNAME,
+			ADRTYP :DftIFD."SUPP_SEG"."ADRTYP"[0],
+			ADRLN1 :LocVal.AAADD1,
+			ADRLN2 :LocVal.AAADD2,
+			ADRLN3 :LocVal.AAADD3,
+			ADRCTY :LocVal.AACITY,
+			ADRSTC :LocVal.AASTAT,
+			ADRPSZ :LocVal.AAPSCD default 0 as String,
+//			CTRY_NAME :DftIFD."SUPP_SEG"."CTRY_NAME"[0],
+			CTRY_NAME :LocVal.AAHOME,
+			RGNCOD :DftIFD."SUPP_SEG"."RGNCOD"[0],
+			PHNNUM :LocVal.AAPHON default 0 as String,
+			FAXNUM :LocVal.AAFAXN default 0 as String,
+			RSAFLG :DftIFD."SUPP_SEG"."RSAFLG"[0],
+			TEMP_FLG :DftIFD."SUPP_SEG"."TEMP_FLG"[0],
+//			LAST_NAME :DftIFD."SUPP_SEG"."LAST_NAME"[0],
+//			FIRST_NAME :DftIFD."SUPP_SEG"."FIRST_NAME"[0],
+			LAST_NAME :LocVal.ASNAME,
+			FIRST_NAME :LocVal.ASNAME,
+			HONORIFIC :DftIFD."SUPP_SEG"."HONORIFIC"[0],
+			ADR_DISTRICT :DftIFD."SUPP_SEG"."ADR_DISTRICT"[0],
+			WEB_ADR :LocVal.AAWADD,
+			EMAIL_ADR :LocVal.AAEMAL,
+			PAGNUM :DftIFD."SUPP_SEG"."PAGNUM"[0],
+			LOCALE_ID :DftIFD."SUPP_SEG"."LOCALE_ID"[0],
+			PO_BOX_FLG :DftIFD."SUPP_SEG"."PO_BOX_FLG"[0],
+			TRK_CNSG_COD :DftIFD."SUPP_SEG"."TRK_CNSG_COD"[0],
+			ASSET_TYP :DftIFD."SUPP_SEG"."ASSET_TYP"[0],
+			RCVSTS :DftIFD."SUPP_SEG"."RCVSTS"[0],
+			LOT_FMT_ID :DftIFD."SUPP_SEG"."LOT_FMT_ID"[0],
+			SER_NUM_TYP_ID :DftIFD."SUPP_SEG"."SER_NUM_TYP_ID"[0],
+			TRUST_FLG :DftIFD."SUPP_SEG"."TRUST_FLG_Vnd"[0],
+			LOAD_ATTR1_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR1_CFG"[0],
+			LOAD_ATTR2_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR2_CFG"[0],
+			LOAD_ATTR3_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR3_CFG"[0],
+			LOAD_ATTR4_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR4_CFG"[0],
+			LOAD_ATTR5_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR5_CFG"[0]
+			}				
+		}		
+	}
+	)
+			
+	}
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++&quot;_Supp_Vendor_&quot;++ vars.VndNum 
+++ '_' ++ now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;} default ''++&quot;.xml&quot;]" doc:name="Out_FileName" doc:id="f1d4c341-33d9-4928-aa84-9561c0212ea5" variableName="Out_FileName"/>
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="cb5b447e-99ce-4ef0-b260-09460c3782b7" variableName="Action"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="dab84b7c-bf1b-4596-809e-5823bf320244" name="MessageStore-Store-FromMMS-Flow"/>
+			<logger level="INFO" doc:name="Logger" doc:id="783d007e-ce09-4ec9-a4c9-d6ef8011b10e" message="#['\n\t stored Supplier XML into message store']"/>
+			<flow-ref doc:name="Send To Destinations" doc:id="b9da311f-0ab2-4dab-a9d6-2ffee64d4af3" name="Outbound_Send_To_Destinations"/>
+			<logger level="INFO" doc:name="Logger" doc:id="684a3be0-523a-4ca5-9f8d-6ea445523e96" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+		
+</foreach>
+	</sub-flow>
+	
+
+
+</mule>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-transfer-receive-test-suite.xml" />
+	<munit:test name="mms-wms-transfer-receive-test-suite-Outbound_TransferReceive_ControlTest" doc:id="5f20ae4e-9c0c-4024-92af-7b2654ad2f9a" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_RCPT_TRANSFER" doc:id="5dd653be-6b32-4567-9b6d-7f37735c85a6" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_RCPT_TRANSFER" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="PO_Transfer_Receive_CrossRefValues" value='#[readUrl("classpath://Outbound/TransferReceive/PO_Transfer_Receive_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read Csv" doc:id="1a59bad4-d4d2-4681-8715-f1b666f82697" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Read CSV file" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="274e8b97-b85a-43c1-be0b-0ca91c6389fd" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/TransferReceive/TRFRCV_OUB_WMS_QUA_WST_20210104183115186534.csv", "application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="MessageStore-Store-FromMMS-Flow" doc:id="055b9108-49ae-4fcd-8d64-b1090bb05a09" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="MessageStore-Store-FromMMS-Flow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send to Destinations" doc:id="bbddc995-6c7b-469e-bb80-76c0a6e1af5b" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_TransferReceive_Control" doc:id="897d6f4e-bde6-4d48-9db7-11f3afd624d3" name="Outbound_TransferReceive_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

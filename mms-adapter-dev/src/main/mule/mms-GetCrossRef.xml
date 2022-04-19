@@ -1,0 +1,1975 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd">
+	<os:object-store name="Object_store_mms_wms_Cust" doc:name="Object store" doc:id="9d8c5f13-4314-419a-87ca-2178664fa2ba" />
+	<os:object-store name="Object_store_mms_wms_Supp" doc:name="Object store" doc:id="24183acc-11f8-4ed6-908f-cca050967ea9" />
+	<os:object-store name="Object_store_mms_wms_Transfer_Order" doc:name="Object store" doc:id="cc5c24d5-3432-480a-ae4b-7c20ac5cfa06" />
+	<os:object-store name="Object_store_mms_wms_Rcpt" doc:name="Object store" doc:id="1191fa25-115a-4075-9481-f7d2fcea3afc" />
+	<os:object-store name="Object_store_mms_wms_PoAsn" doc:name="Object store" doc:id="be582a2b-1008-4964-905f-352a011acff5" />
+	<os:object-store name="Object_store_mms_wms_PoSingleLoc" doc:name="Object store" doc:id="c3697e0f-6684-4a30-b4a9-411d5f445021" />
+	<os:object-store name="Object_store_mms_wms_Rtv" doc:name="Object store" doc:id="64fac27a-3d8d-4da0-8cfd-e03d77fd575f" />
+	<os:object-store name="Object_store_mms_wms_StoreInb" doc:name="Object store" doc:id="17944484-107c-4771-82d8-c3be2ffa38f4" />
+	<file:config name="MMS_InConfig" doc:name="File Config" doc:id="e1d98d93-4e54-45d8-9a7c-4c8e345824b2" >
+		<file:connection workingDir="${MMS.InBoundDir}" />
+	</file:config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="54e66648-420d-48d2-989a-2224261178e1" >
+		<file:connection workingDir="${MMS.GetCrossDir}" />
+	</file:config>
+	<file:config name="File_Config1" doc:name="File Config" doc:id="6b5ec783-5071-449f-bfd3-b5f0ab76906b" >
+		<file:connection workingDir="${MMS.GetCrossDir}" />
+	</file:config>
+	<file:config name="File_Config2" doc:name="File Config" doc:id="7ff70541-0304-4cc8-a9f3-568b9be01e98" >
+		<file:connection workingDir="${MMS.GetCrossDir}" />
+	</file:config>
+	<flow name="GetCrossRef" doc:id="94cfe53e-6fd3-4513-a2bf-a0a55b0a2d93" >
+		<file:read doc:name="Read Csv File and Convert into variable CrossRefData (Json)" doc:id="92b040c8-a0b3-4faf-8883-dd0d743b9ebd" path="#[vars.Global.FileName]" outputMimeType="application/csv" config-ref="MMS_In_Config"/>
+		<set-variable value="#[payload]" doc:name="Set Cross Ref values" doc:id="de40bc09-be0b-4f99-a2cb-4cdf0dfa1684" variableName="GetCross_Values"/>
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+payload filter (trim($.WLFLOW) == 'HOSTMAP')]" doc:name="CrossRefHostMap" doc:id="a9ac2fb6-598c-4d4d-9d48-1f2b3de1f551" variableName="CrossRefHostMap"/>
+		<ee:transform doc:name="Transform Message" doc:id="665b89be-d246-4cd1-ba26-76418bd43fc0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var CrossRefDta = payload filter (trim($.WLFLOW) != 'HOSTMAP')
+
+---
+CrossRefDta orderBy trim($.WLFLOW) groupBy trim($.WLFLOW) pluck $]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="bd5935b9-b419-4fa5-b328-39eec30d491e" >
+			<set-variable value="#[trim(payload[0].WLFLOW)]" doc:name="FlowName" doc:id="16dafb9e-92fc-4b31-b9f0-68aa47c74029" variableName="FlowName"/>
+			<ee:transform doc:name="Transform Message" doc:id="c9d1062d-67db-419d-a110-9b52fa55da48" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+//var DefaultValuesList = vars.CrossRefData
+var DefaultValuesList = payload ++ vars.CrossRefHostMap
+
+
+---
+{
+CrossRef : DefaultValuesList 	reduce 
+		(	(val, acc = {}) -> acc ++ 
+			(
+				{(	trim(val.WLCAT1)  ++ "_" ++ 
+					trim(val.WLCAT2)  ++ "_" ++ 
+					trim(val.WLCAT3)) :
+					 
+				 	(trim(val.WLRETN) default '') 
+				}
+			)
+		),
+		
+//DFTWHS: vars.DefaultValues filter startsWith ($.WLCAT1 default ' ' , "WH_ID") reduce 
+DFTWHS: DefaultValuesList filter startsWith ($.WLCAT1 default ' ' , "WH_ID") reduce 
+			(
+				(val,acc={}  ) -> acc ++
+				(
+					{(trim(val.WLCAT2)) : (trim(val.WLRETN) default '') }
+				)
+				
+			)
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="mms-GetCrossRef_Router" doc:id="ad114cb7-cee2-429b-a061-ac37d6b18c4f" name="mms-GetCrossRef_Router" />
+		</foreach>
+		<file:write doc:name="Write Csv File to GetCrossRef folder" doc:id="c2b785e0-6ed1-44d0-8a93-5cac84b1080a" config-ref="File_Config1" path="${MMS.FilneName}">
+			<file:content ><![CDATA[#[vars.GetCross_Values]]]></file:content>
+		</file:write>
+		<logger level="INFO" doc:name="Logger" doc:id="ca8200a5-0ca7-4677-83ba-5cdde55c4bb1" message="#['\n\t Get Cross Ref values has been written to GettCrossRef folder']"/>
+		<remove-variable doc:name="Remove Variable" doc:id="65000299-e792-4d3f-8cb5-02f8ea579ea2" variableName="GetCross_Values"/>
+		<logger level="INFO" doc:name="Logger" doc:id="7a842867-7106-4f48-ac1f-fef85a2c16bc" message="#['\n\t Removed GetCross_Values variable']" />
+	
+</flow>
+	
+	<flow name="GetCrossRef_2" doc:id="5136ba2c-076e-472f-a626-8164c133f4bc" >
+		<file:read doc:name="Read Csv File and Convert into variable CrossRefData (Json) from GetCrossReff path" doc:id="d7da2213-ac2e-4f11-8db7-a1db40d16c5a" path="${MMS.FilneName}" config-ref="File_Config"/>
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+payload filter (trim($.WLFLOW) == 'HOSTMAP')]" doc:name="CrossRefHostMap" doc:id="1e98bd47-2b28-479f-8577-ad2342dcb64f" variableName="CrossRefHostMap"/>
+		<ee:transform doc:name="Transform Message" doc:id="325a8f4b-bc03-4c70-a9d6-13d1dd03199a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var CrossRefDta = payload filter (trim($.WLFLOW) != 'HOSTMAP')
+
+---
+CrossRefDta orderBy trim($.WLFLOW) groupBy trim($.WLFLOW) pluck $]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="da0db0b7-3ee6-4715-98a7-5d3c9c9cdb19" >
+			<set-variable value="#[trim(payload[0].WLFLOW)]" doc:name="FlowName" doc:id="c1481575-0653-4f90-8596-1b441f25b687" variableName="FlowName"/>
+			<ee:transform doc:name="Transform Message" doc:id="cb907248-268f-4aec-8154-aeeacc98497e" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+//var DefaultValuesList = vars.CrossRefData
+var DefaultValuesList = payload ++ vars.CrossRefHostMap
+
+
+---
+{
+CrossRef : DefaultValuesList 	reduce 
+		(	(val, acc = {}) -> acc ++ 
+			(
+				{(	trim(val.WLCAT1)  ++ "_" ++ 
+					trim(val.WLCAT2)  ++ "_" ++ 
+					trim(val.WLCAT3)) :
+					 
+				 	(trim(val.WLRETN) default '') 
+				}
+			)
+		),
+		
+//DFTWHS: vars.DefaultValues filter startsWith ($.WLCAT1 default ' ' , "WH_ID") reduce 
+DFTWHS: DefaultValuesList filter startsWith ($.WLCAT1 default ' ' , "WH_ID") reduce 
+			(
+				(val,acc={}  ) -> acc ++
+				(
+					{(trim(val.WLCAT2)) : (trim(val.WLRETN) default '') }
+				)
+				
+			)
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="mms-GetCrossRef_Router" doc:id="892ebf01-6da0-4626-8684-dc8e5c1d5e2d" name="mms-GetCrossRef_Router"/>
+		</foreach>
+	</flow>
+	<sub-flow name="mms-GetCrossRef_Router" doc:id="58962b1f-ef59-47f2-9cb1-3e61947c0515" >
+		<choice doc:name="Choice" doc:id="11c04df2-c2a6-46ac-9f9c-e6a8553c0fba">
+			<when expression="#[trim(vars.FlowName) == 'PART_INB_IFD']">
+				<set-variable value="#[payload]" doc:name="PART_INB_CrossRefValues" doc:id="af77d4e5-6f55-4ff3-a9a8-e6ef195881b1" variableName="PART_INB_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_Sku" doc:id="a1342f17-6c64-49df-887e-18921f7505d5" key="#['CrossRefValues' ++ p('GetCrossRef.SKU')]" objectStore="Object_store_mms_wms_Sku">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Part_INB_Ref" : vars.PART_INB_CrossRefValues
+	
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'CUST_INB_IFD']">
+				<set-variable value="#[payload]" doc:name="CUST_INB_CrossRefValues" doc:id="b9929852-0453-42ce-ac31-45f74eedb418" variableName="CUST_INB_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms-wms_Cust" doc:id="4fa5beef-7dd1-42e6-8d39-8128faf03f64" key="#['CrossRefValues' ++ p('GetCrossRef.CUST')]" objectStore="Object_store_mms_wms_Cust">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Cust_INB_Ref" : vars.CUST_INB_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'SUP_INB_IFD']">
+				<set-variable value="#[payload]" doc:name="SUPP_INB_CrossRefValues" doc:id="03a6f004-1e19-4c29-8d7a-2fb0f056bfbf" variableName="SUPP_INB_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_Supp" doc:id="a8424586-9e9c-423b-917d-38a0766e5b1c" key="#['CrossRefValues' ++ p('GetCrossRef.SUP')]" objectStore="Object_store_mms_wms_Supp">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Supp_INB_Ref" : vars.SUPP_INB_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'ORD_TRANSFER']">
+				<set-variable value="#[payload]" doc:name="Transfer_CrossRefValues" doc:id="78c5c437-cd40-44b5-b27b-b51fc50d36ea" variableName="Transfer_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_Transfer_Order" doc:id="90c664c0-9883-471a-a52f-523b882b309a" key="#['CrossRefValues' ++ p('GetCrossRef.ORDER')]" objectStore="Object_store_mms_wms_Transfer_Order">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Transfer_CrossRef" : vars.Transfer_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'RCPT_TRANSFER']">
+				<set-variable value="#[payload]" doc:name="PO_Transfer_Receive_CrossRefValues" doc:id="87360931-2851-4fff-9264-662715bbf382" variableName="PO_Transfer_Receive_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_Rcpt" doc:id="40b1745b-9f23-4659-8388-d0fa719e0a13" key="#['CrossRefValues' ++ p('GetCrossRef.RCPT')]" objectStore="Object_store_mms_wms_Rcpt">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"PO_Transfer_Receive_CrossRef" : vars.PO_Transfer_Receive_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'RCPT_CROSS_DOCK']">
+				<set-variable value="#[payload]" doc:name="PO_ASN_CrossDock_CrossRefValues" doc:id="c9b25e6d-d39e-46dc-8640-0e2eb420298d" variableName="PO_ASN_CrossDock_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_PoAsn" doc:id="854d094d-d26e-44dc-94c2-66590789fc1e" key="#['CrossRefValues' ++ p('GetCrossRef.RCPTCROSSDOCK')]" objectStore="Object_store_mms_wms_PoAsn">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"PO_ASN_XDock_CrossRef" : vars.PO_ASN_CrossDock_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'RA_INB_IFD']">
+				<set-variable value="#[payload]" doc:name="PO_Single_Loc_CrossRefValues" doc:id="84140232-3dee-403d-9a34-59ee6da2d861" variableName="PO_Single_Loc_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_PoSingleLoc" doc:id="fd404411-12f8-4571-9a0e-9a8c8f614ae7" key="#['CrossRefValues' ++ p('GetCrossRef.SINGLELOCPO')]" objectStore="Object_store_mms_wms_PoSingleLoc">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"PO_Single_Loc_CrossRef" : vars.PO_Single_Loc_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'RTV_ORDER']">
+				<set-variable value="#[payload]" doc:name="Rtv_CrossRefValues" doc:id="439be8a7-04ac-4f3e-a868-f558c75c0ee9" variableName="Rtv_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_Rtv" doc:id="695ef884-eeaa-494a-b1bf-b7fe3d826ca9" key="#['CrossRefValues' ++ p('GetCrossRef.RTV')]" objectStore="Object_store_mms_wms_Rtv">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Rtv_CrossRef" : vars.Rtv_CrossRefValues
+}]]]></os:value>
+				</os:store>
+			</when>
+			<when expression="#[trim(vars.FlowName) == 'STORE_INB_IFD']">
+				<set-variable value="#[payload]" doc:name="STORE_INB_CrossRefValues" doc:id="11c0286c-ec3a-4184-92c0-7a2f990d6e7e" variableName="STORE_INB_CrossRefValues" />
+				<os:store doc:name="Store to Object_store_mms_wms_StoreInb" doc:id="9cb7c7ef-e92c-4892-934a-ad8f0c17b6bf" key="#['CrossRefValues' ++ p('GetCrossRef.STOREINB')]" objectStore="Object_store_mms_wms_StoreInb">
+					<os:value><![CDATA[#[output application/json
+---
+{
+	"Store_INB_Ref" : vars.STORE_INB_CrossRefValues,
+}]]]></os:value>
+				</os:store>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="59c0da78-9d37-4878-ac43-c52eb1079267" message="#['\n\t No Cross Reference exists for the Flow Name' ++ vars.FlowName]" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+		<sub-flow name="getCrossRef_PART_INB" doc:id="df0f66c6-5502-460b-a8c1-2a5bc07643a3" >
+		<os:retrieve doc:name="Retrieve" doc:id="51a863c7-dc51-47d2-b519-12cf604a7ee8" key="#['CrossRefValues' ++ p('GetCrossRef.SKU')]" target="RefDtl" objectStore="Object_store_mms_wms_Sku">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Part_INB_Ref" : '',
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="4944d675-cc90-4437-ac5d-c81cc9732d91" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="83a31528-c23d-41d6-b23c-9b5e08945883" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="8b7de1da-f7f7-41c9-8ae6-23190fd79de7" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="49a06932-36f5-418c-8426-0b68b68f81bd" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Part_INB_Ref]" doc:name="PART_INB_CrossRefValues" doc:id="e9beaf3e-c7b2-4bfe-9342-c0dfb3439558" variableName="PART_INB_CrossRefValues" />
+		<ee:transform doc:name="Transform Message" doc:id="680641d8-d122-4b4d-b178-8c95d21870de" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn = 'everywhere'
+var valuesList 				= vars.PART_INB_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.PART_INB_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENTID: getRefVal('ENVIRONMENT','CLIENT_ID')
+	},
+
+	CTRL_SEG: {
+		TRANNAM: getRefVal('CNTRL_SEG','TRANNAM'),
+		TRANVER: getRefVal('CNTRL_SEG','TRANVER'),
+		WHSE_ID: getRefVal('CNTRL_SEG','WHSE_ID')
+		
+		},
+	PART_SEG: {
+		SEGNAM: getRefVal('PART_SEG','SEGNAM'),
+		TRNTYP: getRefVal('PART_SEG','TRNTYP'),
+		PRTNUM: getRefVal('PART_SEG','PRTNUM'),
+		PRT_CLIENT_ID: getRefVal('CLIENT_ID', 'WAP'), /* get MMS id instead of WAP */
+		COMCOD: getRefVal('PART_SEG','COMCOD'),
+		SUBCFG: getRefVal('PART_SEG','SUBCFG'),
+		SCFPOS: getRefVal('PART_SEG','SCFPOS'),
+		DTLCFG: getRefVal('PART_SEG','DTLCFG'),
+		DCFPOS: getRefVal('PART_SEG','DCFPOS'),
+		TYPCOD: getRefVal('PART_SEG','TYPCOD'),
+		PRTFAM: getRefVal('PART_SEG','PRTFAM'),
+		LODLVL: getRefVal('PART_SEG','LODLVL'),
+		ORGFLG: getRefVal('PART_SEG','ORGFLG'),
+		REVFLG: getRefVal('PART_SEG','REVFLG'),
+		LOTFLG: getRefVal('PART_SEG','LOTFLG'),
+		SUP_LOT_FLG: getRefVal('PART_SEG','SUP_LOT_FLG'),
+		UNTCST: getRefVal('PART_SEG','UNTCST'),
+		REOQTY: getRefVal('PART_SEG','REOQTY'),
+		REOPNT: getRefVal('PART_SEG','REOPNT'),
+		PKGTYP: getRefVal('PART_SEG','PKGTYP'),
+		STKUOM: getRefVal('PART_SEG','STKUOM'),
+		UNTPAK: getRefVal('PART_SEG','UNTPAK'),
+		PAKUOM: getRefVal('PART_SEG','PAKUOM'),
+		UNTCAS: getRefVal('PART_SEG','UNTCAS'),
+		CASUOM: getRefVal('PART_SEG','CASUOM'),
+		UNTPAL: getRefVal('PART_SEG','UNTPAL'),
+		PALUOM: getRefVal('PART_SEG','PALUOM'),
+		UNTLEN: getRefVal('PART_SEG','UNTLEN'),
+		PAKLEN: getRefVal('PART_SEG','PAKLEN'),
+		GRSWGT: getRefVal('PART_SEG','GRSWGT'),
+		NETWGT: getRefVal('PART_SEG','NETWGT'),
+		FTPCOD: getRefVal('PART_SEG','FTPCOD'),
+		ABCCOD: getRefVal('PART_SEG','ABCCOD'),
+		FIFWIN: getRefVal('PART_SEG','FIFWIN'),
+		VELZON: getRefVal('PART_SEG','VELZON'),
+		RCVSTS: getRefVal('PART_SEG','RCVSTS'),
+		RCVUOM: getRefVal('PART_SEG','RCVUOM'),
+		RCVFLG: getRefVal('PART_SEG','RCVFLG'),
+		PRDFLG: getRefVal('PART_SEG','PRDFLG'),
+		LTLCLS: getRefVal('PART_SEG','LTLCLS'),
+		WIP_PRTFLG: getRefVal('PART_SEG','WIP_PRTFLG'),
+		DTE_CODE: getRefVal('PART_SEG','DTE_CODE'),
+		AGE_PFLNAM: getRefVal('PART_SEG','AGE_PFLNAM'),
+		CATCH_COD: getRefVal('PART_SEG','CATCH_COD'),
+		CATCH_UNTTYP: getRefVal('PART_SEG','CATCH_UNTTYP'),
+		CATCH_UNTWGT: getRefVal('PART_SEG','CATCH_UNTWGT'),
+		CATCH_UNTCST: getRefVal('PART_SEG','CATCH_UNTCST'),
+		MIN_CATCH_QTY: getRefVal('PART_SEG','MIN_CATCH_QTY'),
+		MAX_CATCH_QTY: getRefVal('PART_SEG','MAX_CATCH_QTY'),
+		CNZFLG: getRefVal('PART_SEG','CNZFLG'),
+		CNZAMT: getRefVal('PART_SEG','CNZAMT'),
+		TIMCOD: getRefVal('PART_SEG','TIMCOD'),
+		STCCOD: getRefVal('PART_SEG','STCCOD'),
+		PARCEL_FLG: getRefVal('PART_SEG','PARCEL_FLG'),
+		HAZMAT_FLG: getRefVal('PART_SEG','HAZMAT_FLG'),
+		NSTCLS: getRefVal('PART_SEG','NSTCLS'),
+		INSFLG: getRefVal('PART_SEG','INSFLG'),
+		SER_TYP: getRefVal('PART_SEG','SER_TYP'),
+		SER_LVL: getRefVal('PART_SEG','SER_LVL'),
+		WGTCOD: getRefVal('PART_SEG','WGTCOD'),
+		LOD_TAG_ENCODE: getRefVal('PART_SEG','LOD_TAG_ENCODE'),
+		SUB_TAG_ENCODE: getRefVal('PART_SEG','SUB_TAG_ENCODE'),
+		CO_PREFIX_LEN: getRefVal('PART_SEG','CO_PREFIX_LEN'),
+		TIME_TO_WARN_FOR_EXP: getRefVal('PART_SEG','TIME_TO_WARN_FOR_EXP'),
+		PRTADJFLG: getRefVal('PART_SEG','PRTADJFLG'),
+		CNTBCK_ENA_FLG: getRefVal('PART_SEG','CNTBCK_ENA_FLG'),
+		CNT_THR_CST: getRefVal('PART_SEG','CNT_THR_CST'),
+		CNT_THR_UNIT: getRefVal('PART_SEG','CNT_THR_UNIT'),
+		PRTSTYLE: getRefVal('PART_SEG','PRTSTYLE'),
+		PRTFIT: getRefVal('PART_SEG','PRTFIT'),
+		PRTCOLOR: getRefVal('PART_SEG','PRTCOLOR'),
+		PRTSIZE: getRefVal('PART_SEG','PRTSIZE'),
+		PCK_STEAL_FLG: getRefVal('PART_SEG','PCK_STEAL_FLG'),
+		CATCH_UNTWGT_MU: getRefVal('PART_SEG','CATCH_UNTWGT_MU'),
+		GRSWGT_MU: getRefVal('PART_SEG','GRSWGT_MU'),
+		NETWGT_MU: getRefVal('PART_SEG','NETWGT_MU'),
+		PAKLEN_MU: getRefVal('PART_SEG','PAKLEN_MU'),
+		UNTLEN_MU: getRefVal('PART_SEG','UNTLEN_MU'),
+		CRNCY_CODE: getRefVal('PART_SEG','CRNCY_CODE'),
+		BOX_PCK_FLG: getRefVal('PART_SEG','BOX_PCK_FLG'),
+		AVG_CATCH: getRefVal('PART_SEG','AVG_CATCH'),
+		BTO_SUBST_PRTNUM: getRefVal('PART_SEG','BTO_SUBST_PRTNUM'),
+		BTO_OBSO_FLG: getRefVal('PART_SEG','BTO_OBSO_FLG'),
+		DSPUOM: getRefVal('PART_SEG','DSPUOM'),
+		RPTUOM: getRefVal('PART_SEG','RPTUOM'),
+		IGNORE_CON_FLG: getRefVal('PART_SEG','IGNORE_CON_FLG'),
+		LOT_FMT_ID: getRefVal('PART_SEG','LOT_FMT_ID'),
+		ABS_ORDINV_WIN: getRefVal('PART_SEG','ABS_ORDINV_WIN'),
+		ABS_ORDINV_CODE: getRefVal('PART_SEG','ABS_ORDINV_CODE'),
+		THRESH_PCK_VAR: getRefVal('PART_SEG','THRESH_PCK_VAR'),
+		DTE_WIN_TYP: getRefVal('PART_SEG','DTE_WIN_TYP'),
+		CSTMS_ITM_TYP: getRefVal('PART_SEG','CSTMS_ITM_TYP'),
+		CSTMS_CRNCY: getRefVal('PART_SEG','CSTMS_CRNCY'),
+		DFLT_ORGCOD: getRefVal('PART_SEG','DFLT_ORGCOD'),
+		CSTMS_VAT_COD: getRefVal('PART_SEG','CSTMS_VAT_COD'),
+		DTY_STMP_TRK_FLG: getRefVal('PART_SEG','DTY_STMP_TRK_FLG'),
+		CSTMS_CST: getRefVal('PART_SEG','CSTMS_CST'),
+		CSTMS_CMMDTY_COD: getRefVal('PART_SEG','CSTMS_CMMDTY_COD'),
+		VELZON_RECALC_FLG: getRefVal('PART_SEG','VELZON_RECALC_FLG'),
+		PRT_DISPTN: getRefVal('PART_SEG','PRT_DISPTN'),
+		DEPT_COD: getRefVal('PART_SEG','DEPT_COD'), 
+		UNT_INS_VAL: getRefVal('PART_SEG','UNT_INS_VAL'),
+		REL_VAL: getRefVal('PART_SEG','REL_VAL'),
+		REL_VAL_UNT_TYP: getRefVal('PART_SEG','REL_VAL_UNT_TYP'),
+		PRT_DISP: getRefVal('PART_SEG','PRT_DISP'),
+		HTSNUM: getRefVal('PART_SEG','HTSNUM'),
+		SCHEDBNUM: getRefVal('PART_SEG','SCHEDBNUM'),
+		PRC_FOR_RPS_FLG: getRefVal('PART_SEG','PRC_FOR_RPS_FLG'),
+		ATTR_STR1: getRefVal('PART_SEG','ATTR_STR1'),
+		ATTR_STR2: getRefVal('PART_SEG','ATTR_STR2'),
+		ATTR_STR3: getRefVal('PART_SEG','ATTR_STR3'),
+		ATTR_STR4: getRefVal('PART_SEG','ATTR_STR4'),
+		ATTR_STR5: getRefVal('PART_SEG','ATTR_STR5'),
+		ATTR_STR6: getRefVal('PART_SEG','ATTR_STR6'),
+		ATTR_STR7: getRefVal('PART_SEG','ATTR_STR7'),
+		ATTR_STR8: getRefVal('PART_SEG','ATTR_STR8'),
+		ATTR_STR9: getRefVal('PART_SEG','ATTR_STR9'),
+		ATTR_STR10: getRefVal('PART_SEG','ATTR_STR10'),
+		
+		ATTR_INT1: getRefVal('PART_SEG','ATTR_INT1'),
+	 	ATTR_INT2: getRefVal('PART_SEG','ATTR_INT2'),
+	 	ATTR_INT3: getRefVal('PART_SEG','ATTR_INT3'),
+	 	ATTR_INT4: getRefVal('PART_SEG','ATTR_INT4'),
+			
+		ATTR_INT5: getRefVal('PART_SEG','ATTR_INT5'),
+		ATTR_FLT1: getRefVal('PART_SEG','ATTR_FLT1'),
+		ATTR_FLT2: getRefVal('PART_SEG','ATTR_FLT2'),
+		ATTR_FLT3: getRefVal('PART_SEG','ATTR_FLT3'),
+		ATTR_DTE1: getRefVal('PART_SEG','ATTR_DTE1'),
+		ATTR_DTE2: getRefVal('PART_SEG','ATTR_DTE2'),
+		
+		DSP_PRTNUM: getRefVal('PART_SEG','DSP_PRTNUM'),
+			
+		ATTR_STR11: getRefVal('PART_SEG','ATTR_STR11'),
+		ATTR_STR12: getRefVal('PART_SEG','ATTR_STR12'),
+		ATTR_STR13: getRefVal('PART_SEG','ATTR_STR13'),
+		ATTR_STR14: getRefVal('PART_SEG','ATTR_STR14'),
+		ATTR_STR15: getRefVal('PART_SEG','ATTR_STR15'), 
+		ATTR_STR16: getRefVal('PART_SEG','ATTR_STR16'),
+		ATTR_STR17: getRefVal('PART_SEG','ATTR_STR17'),
+		ATTR_STR18: getRefVal('PART_SEG','ATTR_STR18'),
+		PAKFLG: getRefVal('PART_SEG','PAKFLG')
+		},
+	
+	PART_DESCRIPTION_SEG: {
+		SEGNAM: getRefVal('PART_DESCRIPTION_SEG','SEGNAM'),
+		LNGDSC: getRefVal('PART_DESCRIPTION_SEG','LNGDSC'),
+		SHORT_DSC: getRefVal('PART_DESCRIPTION_SEG','SHORT_DSC'),
+		LOCALE_ID: getRefVal('PART_DESCRIPTION_SEG','LOCALE_ID')
+		},
+		
+	REPACK_CLASS_SEG: {
+		SEGNAM:  getRefVal('REPACK_CLASS_SEG','SEGNAM'),
+		RPKCLS:  getRefVal('REPACK_CLASS_SEG','RPKCLS'),
+		SRTSEQ:  getRefVal('REPACK_CLASS_SEG','SRTSEQ')
+		},
+	
+	PART_ALT_PRTNUM_SEG_UPC: {
+		SEGNAM:  getRefVal('PART_ALT_PRTNUM_SEG','SEGNAM','UPC'),
+		ALT_PRT_TYP:  getRefVal('PART_ALT_PRTNUM_SEG','ALT_PRT_TYP','UPC'),
+		ALT_PRTNUM:  getRefVal('PART_ALT_PRTNUM_SEG','ALT_PRTNUM','UPC'),
+		UOMCOD:  getRefVal('PART_ALT_PRTNUM_SEG','UOMCOD','UPC'),
+		RFID_FILTER_VAL_COD:  getRefVal('PART_ALT_PRTNUM_SEG','RFID_FILTER_VAL_COD','UPC'),
+		DSP_PRT_FLG:  getRefVal('PART_ALT_PRTNUM_SEG','DSP_PRT_FLG','UPC')
+		},
+	
+	PART_ALT_PRTNUM_SEG_VDR: {
+		SEGNAM:  getRefVal('PART_ALT_PRTNUM_SEG','SEGNAM','VDRCOD'),
+		ALT_PRT_TYP:  getRefVal('PART_ALT_PRTNUM_SEG','ALT_PRT_TYP','VDRCOD'),
+		ALT_PRTNUM:  getRefVal('PART_ALT_PRTNUM_SEG','ALT_PRTNUM','VDRCOD'),
+		UOMCOD:  getRefVal('PART_ALT_PRTNUM_SEG','UOMCOD','VDRCOD'),
+		RFID_FILTER_VAL_COD:  getRefVal('PART_ALT_PRTNUM_SEG','RFID_FILTER_VAL_COD','VDRCOD'),
+		DSP_PRT_FLG:  getRefVal('PART_ALT_PRTNUM_SEG','DSP_PRT_FLG','VDRCOD')
+		},
+	
+	PART_FOOTPRINT_SEG: {
+		SEGNAM:  getRefVal('PART_FOOTPRINT_SEG','SEGNAM'),
+		
+		FTPCOD:  getRefVal('PART_FOOTPRINT_SEG','FTPCOD'),
+		LNGDSC:  getRefVal('PART_FOOTPRINT_SEG','LNGDSC'),
+		SHORT_DSC:  getRefVal('PART_FOOTPRINT_SEG','SHORT_DSC'),
+		
+		LOCALE_ID:  getRefVal('PART_FOOTPRINT_SEG','LOCALE_ID'),
+		CASLVL:  getRefVal('PART_FOOTPRINT_SEG','CASLVL'),
+		NSTLEN:  getRefVal('PART_FOOTPRINT_SEG','NSTLEN'),
+		NSTLEN_MU:  getRefVal('PART_FOOTPRINT_SEG','NSTLEN_MU'),
+		NSTWID:  getRefVal('PART_FOOTPRINT_SEG','NSTWID'),
+		NSTHGT:  getRefVal('PART_FOOTPRINT_SEG','NSTHGT'),
+		PAL_STCK_HGT:  getRefVal('PART_FOOTPRINT_SEG','PAL_STCK_HGT'),
+		DEF_ASSET_TYP:  getRefVal('PART_FOOTPRINT_SEG','DEF_ASSET_TYP'),
+		DEFFTP_FLG:  getRefVal('PART_FOOTPRINT_SEG','DEFFTP_FLG'),
+		LOAD_ATTR1_CFG:  getRefVal('PART_FOOTPRINT_SEG','LOAD_ATTR1_CFG'),
+		LOAD_ATTR2_CFG:  getRefVal('PART_FOOTPRINT_SEG','LOAD_ATTR2_CFG'),
+		LOAD_ATTR3_CFG:  getRefVal('PART_FOOTPRINT_SEG','LOAD_ATTR3_CFG'),
+		LOAD_ATTR4_CFG:  getRefVal('PART_FOOTPRINT_SEG','LOAD_ATTR4_CFG'),
+		LOAD_ATTR5_CFG:  getRefVal('PART_FOOTPRINT_SEG','LOAD_ATTR5_CFG'),
+		STKMTD:  getRefVal('PART_FOOTPRINT_SEG','STKMTD')
+		},
+	
+	
+	PART_FOOTPRINT_DTL_SEG_PC: {
+		SEGNAM:  getRefVal('PART_FOOTPRINT_DTL_SEG','SEGNAM','PC'),
+		UOMCOD:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMCOD', 'PC'),
+		UOMLVL: getRefVal('PART_FOOTPRINT_DTL_SEG','UOMLVL', 'PC'),
+		LEN:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN','PC'),
+		WID:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID', 'PC'),
+		HGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT', 'PC'),
+		GRSWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT','PC'),
+		NETWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT','PC'),
+		PAL_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAL_FLG','PC'),
+		CAS_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CAS_FLG','PC'),
+		PAK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAK_FLG','PC'),
+		STK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','STK_FLG','PC'),
+		RCV_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','RCV_FLG','PC'),
+		UNTQTY:  getRefVal('PART_FOOTPRINT_DTL_SEG','UNTQTY','PC'),
+		LEN_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN_MU','PC'),
+		WID_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID_MU','PC'),
+		HGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT_MU','PC'),
+		GRSWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT_MU','PC'),
+		NETWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT_MU','PC'),
+		CTN_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_FLG','PC'),
+		THRESH_PCT:  getRefVal('PART_FOOTPRINT_DTL_SEG','THRESH_PCT','PC'),
+		CTN_DSTR_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_DSTR_FLG','PC'),
+		BULK_PCK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','BULK_PCK_FLG','PC'),
+		CTRLFLAG: getRefVal('PART_FOOTPRINT_DTL_SEG','CTRLFLAG','PC')
+		},
+		
+		
+	PART_FOOTPRINT_DTL_SEG_IP: {
+		SEGNAM:  getRefVal('PART_FOOTPRINT_DTL_SEG','SEGNAM','IP'),
+		UOMCOD:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMCOD','IP'),
+		UOMLVL:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMLVL'),
+		LEN:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN','IP'),
+		WID:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID','IP'),
+		HGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT','IP'),
+		GRSWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT','IP'),
+		NETWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT','IP'),
+		PAL_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAL_FLG','IP'),
+		CAS_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CAS_FLG','IP'),
+		PAK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAK_FLG','IP'),
+		STK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','STK_FLG','IP'),
+		RCV_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','RCV_FLG','IP'),
+		UNTQTY:  getRefVal('PART_FOOTPRINT_DTL_SEG','UNTQTY','IP'),
+		LEN_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN_MU','IP'),
+		WID_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID_MU','IP'),
+		HGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT_MU','IP'),
+		GRSWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT_MU','IP'),
+		NETWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT_MU','IP'),
+		CTN_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_FLG','IP'),
+		THRESH_PCT:  getRefVal('PART_FOOTPRINT_DTL_SEG','THRESH_PCT','IP'),
+		CTN_DSTR_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_DSTR_FLG','IP'),
+		BULK_PCK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','BULK_PCK_FLG','IP'),
+		CTRLFLAG: getRefVal('PART_FOOTPRINT_DTL_SEG','CTRLFLAG','IP')
+		},
+		
+ 	PART_FOOTPRINT_DTL_SEG_CS: {
+		SEGNAM:  getRefVal('PART_FOOTPRINT_DTL_SEG','SEGNAM','CS'),
+		UOMCOD:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMCOD','CS'),
+		UOMLVL:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMLVL'),
+		LEN:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN','CS'),
+		WID:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID','CS'),
+		HGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT','CS'),
+		GRSWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT','CS'),
+		NETWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT','CS'),
+		PAL_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAL_FLG','CS'),
+		CAS_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CAS_FLG','CS'),
+		PAK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAK_FLG','CS'),
+		STK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','STK_FLG','CS'),
+		RCV_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','RCV_FLG','CS'),
+		UNTQTY:  getRefVal('PART_FOOTPRINT_DTL_SEG','UNTQTY','CS'),
+		LEN_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN_MU','CS'),
+		WID_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID_MU','CS'),
+		HGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT_MU','CS'),
+		GRSWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT_MU','CS'),
+		NETWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT_MU','CS'),
+		CTN_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_FLG','CS'),
+		THRESH_PCT:  getRefVal('PART_FOOTPRINT_DTL_SEG','THRESH_PCT','CS'),
+		CTN_DSTR_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_DSTR_FLG','CS'),
+		BULK_PCK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','BULK_PCK_FLG','CS'),
+		CTRLFLAG: getRefVal('PART_FOOTPRINT_DTL_SEG','CTRLFLAG','CS')
+		},
+		
+			
+	PART_FOOTPRINT_DTL_SEG_PA: {
+		SEGNAM:  getRefVal('PART_FOOTPRINT_DTL_SEG','SEGNAM','PA'),
+		UOMCOD:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMCOD','PA'),
+		UOMLVL:  getRefVal('PART_FOOTPRINT_DTL_SEG','UOMLVL','PA'),
+		LEN:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN','PA'),
+		WID:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID','PA'),
+		HGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT','PA'),
+		GRSWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT','PA'),
+		NETWGT:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT','PA'),
+		PAL_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAL_FLG','PA'),
+		CAS_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CAS_FLG','PA'),
+		PAK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','PAK_FLG','PA'),
+		STK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','STK_FLG','PA'),
+		RCV_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','RCV_FLG','PA'),
+		UNTQTY:  getRefVal('PART_FOOTPRINT_DTL_SEG','UNTQTY','PA'),
+		LEN_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','LEN_MU','PA'),
+		WID_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','WID_MU','PA'),
+		HGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','HGT_MU','PA'),
+		GRSWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','GRSWGT_MU','PA'),
+		NETWGT_MU:  getRefVal('PART_FOOTPRINT_DTL_SEG','NETWGT_MU','PA'),
+		CTN_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_FLG','PA'),
+		THRESH_PCT:  getRefVal('PART_FOOTPRINT_DTL_SEG','THRESH_PCT','PA'),
+		CTN_DSTR_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','CTN_DSTR_FLG','PA'),
+		BULK_PCK_FLG:  getRefVal('PART_FOOTPRINT_DTL_SEG','BULK_PCK_FLG','PA'),
+		CTRLFLAG: getRefVal('PART_FOOTPRINT_DTL_SEG','CTRLFLAG','PA')
+		}
+			
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="PART_INB_CrossRefValues" doc:id="e6180775-b591-40db-9caf-9039ed74bc7b" variableName="PART_INB_CrossRefValues" />
+	</sub-flow>
+	<sub-flow name="getCrossRef_CUST_INB" doc:id="cb915cb3-a1dc-47a8-89c2-3d18bd3385d4" >
+		<os:retrieve doc:name="Retrieve" doc:id="ccaa6016-d02c-4ab2-a88c-2f0b0be7e05b" key="#['CrossRefValues' ++ p('GetCrossRef.CUST')]" target="RefDtl" objectStore="Object_store_mms_wms_Cust">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Cust_INB_Ref" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="bf2ff90a-cd29-4508-b57a-6bf6e7ea858e" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="cef966ba-55a6-4535-8d6f-aab639eed275" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="583a084e-0673-4b42-aeb5-2774d6c2bdf6" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="ba253ea2-609e-40ad-9d45-18cc269a6849" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Cust_INB_Ref]" doc:name="CUST_INB_CrossRefValues" doc:id="1deef1cf-694a-43c5-a001-45cc5123c67e" variableName="CUST_INB_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="8dabd21c-b30f-4da5-ba4a-78e1de4bf3c0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.CUST_INB_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.CUST_INB_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENTID: getRefVal('ENVIRONMENT','CLIENT_ID')
+	},
+
+	CNTRL_SEG: {
+		TRANNAM :getRefVal('CNTRL_SEG','TRANNAM'),
+		TRANVER :getRefVal('CNTRL_SEG','TRANVER'),
+		WHSE_ID :getRefVal('CNTRL_SEG','WHSE_ID')
+	},
+	ADDR_SEG: {
+		SEGNAM :getRefVal('ADDR_SEG','SEGNAM'),
+		TRNTYP :getRefVal('ADDR_SEG','TRNTYP'),
+		CLIENT_ID :getRefVal('ADDR_SEG','CLIENT_ID'),
+		HOST_EXT_ID :getRefVal('ADDR_SEG','HOST_EXT_ID'),
+		ADRNAM :getRefVal('ADDR_SEG','ADRNAM'),
+		ADRTYP :getRefVal('ADDR_SEG','ADRTYP'),
+		ADRLN1 :getRefVal('ADDR_SEG','ADRLN1'),
+		ADRLN2 :getRefVal('ADDR_SEG','ADRLN2'),
+		ADRLN3 :getRefVal('ADDR_SEG','ADRLN3'),
+		ADRCTY :getRefVal('ADDR_SEG','ADRCTY'),
+		ADRSTC :getRefVal('ADDR_SEG','ADRSTC'),
+		ADRPSZ :getRefVal('ADDR_SEG','ADRPSZ'),
+		CTRY_NAME :getRefVal('ADDR_SEG','CTRY_NAME'),
+		RGNCOD :getRefVal('ADDR_SEG','RGNCOD'),
+		PHNNUM :getRefVal('ADDR_SEG','PHNNUM'),
+		FAXNUM :getRefVal('ADDR_SEG','FAXNUM'),
+		RSAFLG :getRefVal('ADDR_SEG','RSAFLG'),
+		TEMP_FLG :getRefVal('ADDR_SEG','TEMP_FLG'),
+		LAST_NAME :getRefVal('ADDR_SEG','LAST_NAME'),
+		FIRST_NAME :getRefVal('ADDR_SEG','FIRST_NAME'),
+		HONORIFIC :getRefVal('ADDR_SEG','HONORIFIC'),
+		ADR_DISTRICT :getRefVal('ADDR_SEG','ADR_DISTRICT'),
+		WEB_ADR :getRefVal('ADDR_SEG','WEB_ADR'),
+		EMAIL_ADR :getRefVal('ADDR_SEG','EMAIL_ADR'),
+		PAGNUM :getRefVal('ADDR_SEG','PAGNUM'),
+		LOCALE_ID :getRefVal('ADDR_SEG','LOCALE_ID'),
+		ATTN_NAME :getRefVal('ADDR_SEG','ATTN_NAME'),
+		ATTN_TEL :getRefVal('ADDR_SEG','ATTN_TEL'),
+		CONT_NAME :getRefVal('ADDR_SEG','CONT_NAME'),
+		CONT_TEL :getRefVal('ADDR_SEG','CONT_TEL'),
+		CONT_TITLE :getRefVal('ADDR_SEG','CONT_TITLE'),
+		PO_BOX_FLG :getRefVal('ADDR_SEG','PO_BOX_FLG')
+	},
+	CUST_SEG: {
+		SEGNAM :getRefVal('CUST_SEG','SEGNAM'),
+		TRNTYP :getRefVal('CUST_SEG','TRNTYP'),
+		CLIENT_ID :getRefVal('CUST_SEG','CLIENT_ID'),
+		BCKFLG :getRefVal('CUST_SEG','BCKFLG'),
+		PARFLG :getRefVal('CUST_SEG','PARFLG'),
+		CARFLG :getRefVal('CUST_SEG','CARFLG'),
+		SPLFLG :getRefVal('CUST_SEG','SPLFLG'),
+		STDFLG :getRefVal('CUST_SEG','STDFLG'),
+		SHPLBL :getRefVal('CUST_SEG','SHPLBL'),
+		SHIPBY :getRefVal('CUST_SEG','SHIPBY'),
+		WAYBBY :getRefVal('CUST_SEG','WAYBBY'),
+		CARGRP :getRefVal('CUST_SEG','CARGRP'),
+		MANFID :getRefVal('CUST_SEG','MANFID'),
+		DEPTNO :getRefVal('CUST_SEG','DEPTNO'),
+		LOCALE_ID :getRefVal('CUST_SEG','LOCALE_ID'),
+		ORDINV :getRefVal('CUST_SEG','ORDINV'),
+		CSTTYP : {
+			CSTTYP: {
+				STORE: getRefVal('CUST_SEG','CSTTYP','STORE'),
+				STOREZONE: getRefVal('CUST_SEG','CSTTYP','STOREZONE'),
+				VENDOR: getRefVal('CUST_SEG','CSTTYP','VENDOR'),
+				WAREHOUSE: getRefVal('CUST_SEG','CSTTYP','WAREHOUSE')
+				}
+			},
+		INVSTS_PRG :getRefVal('CUST_SEG','INVSTS_PRG'),
+		FRSCOD :getRefVal('CUST_SEG','FRSCOD'),
+		MIN_SHELF_HRS :getRefVal('CUST_SEG','MIN_SHELF_HRS'),
+		RSVPRI :getRefVal('CUST_SEG','RSVPRI'),
+		REQUIR_TMS_COD :getRefVal('CUST_SEG','REQUIR_TMS_COD'),
+		PLTBLD_CONSBY :getRefVal('CUST_SEG','PLTBLD_CONSBY'),
+		LOD_TAG_SNGLE_ENCODE :getRefVal('CUST_SEG','LOD_TAG_SNGLE_ENCODE'),
+		LOD_TAG_MIX_ENCODE :getRefVal('CUST_SEG','LOD_TAG_MIX_ENCODE'),
+		SUB_TAG_SNGLE_ENCODE :getRefVal('CUST_SEG','SUB_TAG_SNGLE_ENCODE'),
+		SUB_TAG_MIX_ENCODE :getRefVal('CUST_SEG','SUB_TAG_MIX_ENCODE'),
+		URN_FORMAT :getRefVal('CUST_SEG','URN_FORMAT'),
+		ALC_SEARCH_PATH :getRefVal('CUST_SEG','ALC_SEARCH_PATH'),
+		ABS_ORDINV_WIN :getRefVal('CUST_SEG','ABS_ORDINV_WIN'),
+		ABS_ORDINV_CODE :getRefVal('CUST_SEG','ABS_ORDINV_CODE'),
+		LOAD_ATTR1_CFG :getRefVal('CUST_SEG','LOAD_ATTR1_CFG'),
+		LOAD_ATTR2_CFG :getRefVal('CUST_SEG','LOAD_ATTR2_CFG'),
+		LOAD_ATTR3_CFG :getRefVal('CUST_SEG','LOAD_ATTR3_CFG'),
+		LOAD_ATTR4_CFG :getRefVal('CUST_SEG','LOAD_ATTR4_CFG'),
+		LOAD_ATTR5_CFG :getRefVal('CUST_SEG','LOAD_ATTR5_CFG'),
+	}			
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="CUST_INB_CrossRefValues" doc:id="ec5e60af-b80e-4faa-9314-ba17e7839a56" variableName="CUST_INB_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_SUPP_INB" doc:id="a4253d56-7180-4609-8d96-e0b251e85f1e" >
+		<os:retrieve doc:name="Retrieve" doc:id="6e3157e8-c96e-46b7-9d3a-64bdfd05e4e4" key="#['CrossRefValues' ++ p('GetCrossRef.SUP')]" target="RefDtl" objectStore="Object_store_mms_wms_Supp">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Supp_INB_Ref" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="8ed5049d-c5a6-4e1e-8f4b-311ccaa7a274" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="cf9c3ea4-b7c4-4506-a0b8-55d3aed4efcd" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="f508bbdd-fd53-4b58-8e51-99d1523e7993" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="891a329a-c42e-45f5-a103-3ce356f42646" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Supp_INB_Ref]" doc:name="SUPP_INB_CrossRefValues" doc:id="51fef527-c937-4f3f-9036-64bbd3010ae1" variableName="SUPP_INB_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="04a596bc-9174-4d06-9dc5-d3d697975983" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 				= vars.SUPP_INB_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.SUPP_INB_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENTID: getRefVal('ENVIRONMENT','CLIENT_ID')
+	},
+
+	CNTRL_SEG: {
+		TRANNAM :getRefVal('CNTRL_SEG','TRANNAM'),
+		TRANVER :getRefVal('CNTRL_SEG','TRANVER'),
+		WHSE_ID :getRefVal('CNTRL_SEG','WHSE_ID')
+
+
+	},
+	SUPP_SEG: {
+		SEGNAM :getRefVal('SUPP_SEG','SEGNAM'),
+		TRNTYP :getRefVal('SUPP_SEG','TRNTYP'),
+		CLIENT_ID :getRefVal('SUPP_SEG','CLIENT_ID'),
+		HOST_EXT_ID :getRefVal('SUPP_SEG','HOST_EXT_ID'),
+		ADRNAM :getRefVal('SUPP_SEG','ADRNAM'),
+		ADRTYP :getRefVal('SUPP_SEG','ADRTYP'),
+		ADRLN1 :getRefVal('SUPP_SEG','ADRLN1'),
+		ADRLN2 :getRefVal('SUPP_SEG','ADRLN2'),
+		ADRLN3 :getRefVal('SUPP_SEG','ADRLN3'),
+		ADRCTY :getRefVal('SUPP_SEG','ADRCTY'),
+		ADRSTC :getRefVal('SUPP_SEG','ADRSTC'),
+		ADRPSZ :getRefVal('SUPP_SEG','ADRPSZ'),
+		CTRY_NAME :getRefVal('SUPP_SEG','CTRY_NAME'),
+		RGNCOD :getRefVal('SUPP_SEG','RGNCOD'),
+		PHNNUM :getRefVal('SUPP_SEG','PHNNUM'),
+		FAXNUM :getRefVal('SUPP_SEG','FAXNUM'),
+		RSAFLG :getRefVal('SUPP_SEG','RSAFLG'),
+		TEMP_FLG :getRefVal('SUPP_SEG','TEMP_FLG'),
+		LAST_NAME :getRefVal('SUPP_SEG','LAST_NAME'),
+		FIRST_NAME :getRefVal('SUPP_SEG','FIRST_NAME'),
+		HONORIFIC :getRefVal('SUPP_SEG','HONORIFIC'),
+		ADR_DISTRICT :getRefVal('SUPP_SEG','ADR_DISTRICT'),
+		WEB_ADR :getRefVal('SUPP_SEG','WEB_ADR'),
+		EMAIL_ADR :getRefVal('SUPP_SEG','EMAIL_ADR'),
+		PAGNUM :getRefVal('SUPP_SEG','PAGNUM'),
+		LOCALE_ID :getRefVal('SUPP_SEG','LOCALE_ID'),
+		PO_BOX_FLG :getRefVal('SUPP_SEG','PO_BOX_FLG'),
+		TRK_CNSG_COD :getRefVal('SUPP_SEG','TRK_CNSG_COD'),
+		ASSET_TYP :getRefVal('SUPP_SEG','ASSET_TYP'),
+		RCVSTS :getRefVal('SUPP_SEG','RCVSTS'),
+		LOT_FMT_ID :getRefVal('SUPP_SEG','LOT_FMT_ID'),
+		SER_NUM_TYP_ID :getRefVal('SUPP_SEG','SER_NUM_TYP_ID'),
+		TRUST_FLG_Store :getRefVal('SUPP_SEG','TRUST_FLG','STORE'),
+		TRUST_FLG_Whs :getRefVal('SUPP_SEG','TRUST_FLG','WAREHOUSE'),
+		TRUST_FLG_Vnd :getRefVal('SUPP_SEG','TRUST_FLG','VENDOR'),
+		LOAD_ATTR1_CFG :getRefVal('SUPP_SEG','LOAD_ATTR1_CFG'),
+		LOAD_ATTR2_CFG :getRefVal('SUPP_SEG','LOAD_ATTR2_CFG'),
+		LOAD_ATTR3_CFG :getRefVal('SUPP_SEG','LOAD_ATTR3_CFG'),
+		LOAD_ATTR4_CFG :getRefVal('SUPP_SEG','LOAD_ATTR4_CFG'),
+		LOAD_ATTR5_CFG :getRefVal('SUPP_SEG','LOAD_ATTR5_CFG')
+	}			
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="SUPP_INB_CrossRefValues" doc:id="55f86155-f8b5-45b0-8d7f-a29cd3ead332" variableName="SUPP_INB_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_ORDER_INB" doc:id="970481ec-363f-4cf4-a623-0deae9e7ad57" >
+		<os:retrieve doc:name="Retrieve" doc:id="f1ad89a1-d671-4a6e-8612-a8f43433e58f" key="#['CrossRefValues' ++ p('GetCrossRef.ORDER')]" target="RefDtl" objectStore="Object_store_mms_wms_Transfer_Order">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Transfer_CrossRef" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="df9b889c-6ef3-4f6e-93cb-fcc762caea36" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="0a981174-4ad2-422e-ad0e-bf2d4493f823" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="5865384d-238e-4bfb-8ae5-d639bdefc5e7" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="09292269-af03-46b6-aaa4-97df1a10ed90" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Transfer_CrossRef]" doc:name="Transfer_CrossRefValues" doc:id="0e61a62d-de01-4129-931f-52b7119964e9" variableName="Transfer_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="b49e7bc9-a433-4f67-94bd-5d337b80cd25" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.Transfer_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.Transfer_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENT_ID: getRefVal('ENVIRONMENT','CLIENT_ID'),
+		ATRTYP: getRefVal('STOREZONE','ATTRIBUTE_TYPE_ID'),
+		SUBATRTYP: getRefVal('STOREZONE','SUB_ATTRIBUTE_TYPE')
+		
+		},
+	CTRL_SEG: {
+		TRNNAM: getRefVal('CNTRL_SEG','TRNNAM'),
+		TRNVER: getRefVal('CNTRL_SEG','TRNVER')
+		},
+	ST_CUST_SEG: {
+		SEGNAM:  getRefVal('ST_CUST_SEG', 'SEGNAM'),
+		CLIENT_ID:  getRefVal('ST_CUST_SEG', 'CLIENT_ID'),
+		HOST_EXT_ID:  getRefVal('ST_CUST_SEG', 'HOST_EXT_ID'),
+		ADRNAM:  getRefVal('ST_CUST_SEG', 'ADRNAM'),
+		ADRTYP:  getRefVal('ST_CUST_SEG', 'ADRTYP'),
+		ADRLN1:  getRefVal('ST_CUST_SEG', 'ADRLN1'),
+		ADRLN2:  getRefVal('ST_CUST_SEG', 'ADRLN2'),
+		ADRLN3:  getRefVal('ST_CUST_SEG', 'ADRLN3'),
+		ADRCTY:  getRefVal('ST_CUST_SEG', 'ADRCTY'),
+		ADRSTC:  getRefVal('ST_CUST_SEG', 'ADRSTC'),
+		ADRPSZ:  getRefVal('ST_CUST_SEG', 'ADRPSZ'),
+		CTRY_NAME:  getRefVal('ST_CUST_SEG', 'CTRY_NAME'),
+		RGNCOD:  getRefVal('ST_CUST_SEG', 'RGNCOD'),
+		PHNNUM:  getRefVal('ST_CUST_SEG', 'PHNNUM'),
+		FAXNUM:  getRefVal('ST_CUST_SEG', 'FAXNUM'),
+		RSAFLG:  getRefVal('ST_CUST_SEG', 'RSAFLG'),
+		TEMP_FLG:  getRefVal('ST_CUST_SEG', 'TEMP_FLG'),
+		LAST_NAME:  getRefVal('ST_CUST_SEG', 'LAST_NAME'),
+		FIRST_NAME:  getRefVal('ST_CUST_SEG', 'FIRST_NAME'),
+		HONORIFIC:  getRefVal('ST_CUST_SEG', 'HONORIFIC'),
+		ADR_DISTRICT:  getRefVal('ST_CUST_SEG', 'ADR_DISTRICT'),
+		WEB_ADR:  getRefVal('ST_CUST_SEG', 'WEB_ADR'),
+		EMAIL_ADR:  getRefVal('ST_CUST_SEG', 'EMAIL_ADR'),
+		PAGNUM:  getRefVal('ST_CUST_SEG', 'PAGNUM'),
+		LOCALE_ID:  getRefVal('ST_CUST_SEG', 'LOCALE_ID'),
+		ATTN_NAME:  getRefVal('ST_CUST_SEG', 'ATTN_NAME'),
+		ATTN_TEL:  getRefVal('ST_CUST_SEG', 'ATTN_TEL'),
+		CONT_NAME:  getRefVal('ST_CUST_SEG', 'CONT_NAME'),
+		CONT_TEL:  getRefVal('ST_CUST_SEG', 'CONT_TEL'),
+		CONT_TITLE:  getRefVal('ST_CUST_SEG', 'CONT_TITLE'),
+		PO_BOX_FLG:  getRefVal('ST_CUST_SEG', 'PO_BOX_FLG'),
+		SHIP_PHNNUM:  getRefVal('ST_CUST_SEG', 'SHIP_PHNNUM'),
+		SHIP_FAXNUM:  getRefVal('ST_CUST_SEG', 'SHIP_FAXNUM'),
+		SHIP_WEB_ADR:  getRefVal('ST_CUST_SEG', 'SHIP_WEB_ADR'),
+		SHIP_EMAIL_ADR:  getRefVal('ST_CUST_SEG', 'SHIP_EMAIL_ADR'),
+		SHIP_CONT_NAME:  getRefVal('ST_CUST_SEG', 'SHIP_CONT_NAME'),
+		SHIP_CONT_TITLE:  getRefVal('ST_CUST_SEG', 'SHIP_CONT_TITLE'),
+		SHIP_CONT_TEL:  getRefVal('ST_CUST_SEG', 'SHIP_CONT_TEL'),
+		SHIP_ATTN_NAME:  getRefVal('ST_CUST_SEG', 'SHIP_ATTN_NAME'),
+		SHIP_ATTN_PHNNUM:  getRefVal('ST_CUST_SEG', 'SHIP_ATTN_PHNNUM')		
+	},
+	RT_CUST_SEG: {
+		SEGNAM:  getRefVal('RT_CUST_SEG', 'SEGNAM'),
+		CLIENT_ID:  getRefVal('RT_CUST_SEG', 'CLIENT_ID'),
+		HOST_EXT_ID:  getRefVal('RT_CUST_SEG', 'HOST_EXT_ID'),
+		ADRNAM:  getRefVal('RT_CUST_SEG', 'ADRNAM'),
+		ADRTYP:  getRefVal('RT_CUST_SEG', 'ADRTYP'),
+		ADRLN1:  getRefVal('RT_CUST_SEG', 'ADRLN1'),
+		ADRLN2:  getRefVal('RT_CUST_SEG', 'ADRLN2'),
+		ADRLN3:  getRefVal('RT_CUST_SEG', 'ADRLN3'),
+		ADRCTY:  getRefVal('RT_CUST_SEG', 'ADRCTY'),
+		ADRSTC:  getRefVal('RT_CUST_SEG', 'ADRSTC'),
+		ADRPSZ:  getRefVal('RT_CUST_SEG', 'ADRPSZ'),
+		CTRY_NAME:  getRefVal('RT_CUST_SEG', 'CTRY_NAME'),
+		RGNCOD:  getRefVal('RT_CUST_SEG', 'RGNCOD'),
+		PHNNUM:  getRefVal('RT_CUST_SEG', 'PHNNUM'),
+		FAXNUM:  getRefVal('RT_CUST_SEG', 'FAXNUM'),
+		RSAFLG:  getRefVal('RT_CUST_SEG', 'RSAFLG'),
+		TEMP_FLG:  getRefVal('RT_CUST_SEG', 'TEMP_FLG'),
+		LAST_NAME:  getRefVal('RT_CUST_SEG', 'LAST_NAME'),
+		FIRST_NAME:  getRefVal('RT_CUST_SEG', 'FIRST_NAME'),
+		HONORIFIC:  getRefVal('RT_CUST_SEG', 'HONORIFIC'),
+		ADR_DISTRICT:  getRefVal('RT_CUST_SEG', 'ADR_DISTRICT'),
+		WEB_ADR:  getRefVal('RT_CUST_SEG', 'WEB_ADR'),
+		EMAIL_ADR:  getRefVal('RT_CUST_SEG', 'EMAIL_ADR'),
+		PAGNUM:  getRefVal('RT_CUST_SEG', 'PAGNUM'),
+		LOCALE_ID:  getRefVal('RT_CUST_SEG', 'LOCALE_ID'),
+		ATTN_NAME:  getRefVal('RT_CUST_SEG', 'ATTN_NAME'),
+		ATTN_TEL:  getRefVal('RT_CUST_SEG', 'ATTN_TEL'),
+		CONT_NAME:  getRefVal('RT_CUST_SEG', 'CONT_NAME'),
+		CONT_TEL:  getRefVal('RT_CUST_SEG', 'CONT_TEL'),
+		CONT_TITLE:  getRefVal('RT_CUST_SEG', 'CONT_TITLE'),
+		PO_BOX_FLG:  getRefVal('RT_CUST_SEG', 'PO_BOX_FLG'),
+		SHIP_PHNNUM:  getRefVal('RT_CUST_SEG', 'SHIP_PHNNUM'),
+		SHIP_FAXNUM:  getRefVal('RT_CUST_SEG', 'SHIP_FAXNUM'),
+		SHIP_WEB_ADR:  getRefVal('RT_CUST_SEG', 'SHIP_WEB_ADR'),
+		SHIP_EMAIL_ADR:  getRefVal('RT_CUST_SEG', 'SHIP_EMAIL_ADR'),
+		SHIP_CONT_NAME:  getRefVal('RT_CUST_SEG', 'SHIP_CONT_NAME'),
+		SHIP_CONT_TITLE:  getRefVal('RT_CUST_SEG', 'SHIP_CONT_TITLE'),
+		SHIP_CONT_TEL:  getRefVal('RT_CUST_SEG', 'SHIP_CONT_TEL'),
+		SHIP_ATTN_NAME:  getRefVal('RT_CUST_SEG', 'SHIP_ATTN_NAME'),
+		SHIP_ATTN_PHNNUM:  getRefVal('RT_CUST_SEG', 'SHIP_ATTN_PHNNUM')
+	},
+	BT_CUST_SEG: {
+		SEGNAM:  getRefVal('BT_CUST_SEG', 'SEGNAM'),
+		CLIENT_ID:  getRefVal('BT_CUST_SEG', 'CLIENT_ID'),
+		HOST_EXT_ID:  getRefVal('BT_CUST_SEG', 'HOST_EXT_ID'),
+		ADRNAM:  getRefVal('BT_CUST_SEG', 'ADRNAM'),
+		ADRTYP:  getRefVal('BT_CUST_SEG', 'ADRTYP'),
+		ADRLN1:  getRefVal('BT_CUST_SEG', 'ADRLN1'),
+		ADRLN2:  getRefVal('BT_CUST_SEG', 'ADRLN2'),
+		ADRLN3:  getRefVal('BT_CUST_SEG', 'ADRLN3'),
+		ADRCTY:  getRefVal('BT_CUST_SEG', 'ADRCTY'),
+		ADRSTC:  getRefVal('BT_CUST_SEG', 'ADRSTC'),
+		ADRPSZ:  getRefVal('BT_CUST_SEG', 'ADRPSZ'),
+		CTRY_NAME:  getRefVal('BT_CUST_SEG', 'CTRY_NAME'),
+		RGNCOD:  getRefVal('BT_CUST_SEG', 'RGNCOD'),
+		PHNNUM:  getRefVal('BT_CUST_SEG', 'PHNNUM'),
+		FAXNUM:  getRefVal('BT_CUST_SEG', 'FAXNUM'),
+		RSAFLG:  getRefVal('BT_CUST_SEG', 'RSAFLG'),
+		TEMP_FLG:  getRefVal('BT_CUST_SEG', 'TEMP_FLG'),
+		LAST_NAME:  getRefVal('BT_CUST_SEG', 'LAST_NAME'),
+		FIRST_NAME:  getRefVal('BT_CUST_SEG', 'FIRST_NAME'),
+		HONORIFIC:  getRefVal('BT_CUST_SEG', 'HONORIFIC'),
+		ADR_DISTRICT:  getRefVal('BT_CUST_SEG', 'ADR_DISTRICT'),
+		WEB_ADR:  getRefVal('BT_CUST_SEG', 'WEB_ADR'),
+		EMAIL_ADR:  getRefVal('BT_CUST_SEG', 'EMAIL_ADR'),
+		PAGNUM:  getRefVal('BT_CUST_SEG', 'PAGNUM'),
+		LOCALE_ID:  getRefVal('BT_CUST_SEG', 'LOCALE_ID'),
+		ATTN_NAME:  getRefVal('BT_CUST_SEG', 'ATTN_NAME'),
+		ATTN_TEL:  getRefVal('BT_CUST_SEG', 'ATTN_TEL'),
+		CONT_NAME:  getRefVal('BT_CUST_SEG', 'CONT_NAME'),
+		CONT_TEL:  getRefVal('BT_CUST_SEG', 'CONT_TEL'),
+		CONT_TITLE:  getRefVal('BT_CUST_SEG', 'CONT_TITLE'),
+		PO_BOX_FLG:  getRefVal('BT_CUST_SEG', 'PO_BOX_FLG'),
+		SHIP_PHNNUM:  getRefVal('BT_CUST_SEG', 'SHIP_PHNNUM'),
+		SHIP_FAXNUM:  getRefVal('BT_CUST_SEG', 'SHIP_FAXNUM'),
+		SHIP_WEB_ADR:  getRefVal('BT_CUST_SEG', 'SHIP_WEB_ADR'),
+		SHIP_EMAIL_ADR:  getRefVal('BT_CUST_SEG', 'SHIP_EMAIL_ADR'),
+		SHIP_CONT_NAME:  getRefVal('BT_CUST_SEG', 'SHIP_CONT_NAME'),
+		SHIP_CONT_TITLE:  getRefVal('BT_CUST_SEG', 'SHIP_CONT_TITLE'),
+		SHIP_CONT_TEL:  getRefVal('BT_CUST_SEG', 'SHIP_CONT_TEL'),
+		SHIP_ATTN_NAME:  getRefVal('BT_CUST_SEG', 'SHIP_ATTN_NAME'),
+		SHIP_ATTN_PHNNUM:  getRefVal('BT_CUST_SEG', 'SHIP_ATTN_PHNNUM')		
+	},
+		
+	ORDER_SEG: {
+				SEGNAM:  getRefVal('ORDER_SEG','SEGNAM'),
+				TRNTYP:  getRefVal('ORDER_SEG','TRNTYP'),
+				CLIENT_ID:  getRefVal('ORDER_SEG','CLIENT_ID'),
+				ORDNUM:  getRefVal('ORDER_SEG','ORDNUM'),
+				ORDTYP:  getRefVal('ORDER_SEG','ORDTYP'),
+				ENTDTE:  getRefVal('ORDER_SEG','ENTDTE'),
+				STCUST:  getRefVal('ORDER_SEG','STCUST'),
+				ST_HOST_ADR_ID:  getRefVal('ORDER_SEG','ST_HOST_ADR_ID'),
+				RTCUST:  getRefVal('ORDER_SEG','RTCUST'),
+				RT_HOST_ADR_ID:  getRefVal('ORDER_SEG','RT_HOST_ADR_ID'),
+				BTCUST:  getRefVal('ORDER_SEG','BTCUST'),
+				BT_HOST_ADR_ID:  getRefVal('ORDER_SEG','BT_HOST_ADR_ID'),
+				CPONUM:  getRefVal('ORDER_SEG','CPONUM'),
+				CPODTE:  getRefVal('ORDER_SEG','CPODTE'),
+				CPOTYP:  getRefVal('ORDER_SEG','CPOTYP'),
+				PAYTRM:  getRefVal('ORDER_SEG','PAYTRM'),
+				CARFLG:  getRefVal('ORDER_SEG','CARFLG'),
+				SHIPBY:  getRefVal('ORDER_SEG','SHIPBY'),
+				RRLFLG:  getRefVal('ORDER_SEG','RRLFLG'),
+				WAVE_FLG:  getRefVal('ORDER_SEG','WAVE_FLG'),
+				REQUIR_TMS_FLG:  getRefVal('ORDER_SEG','REQUIR_TMS_FLG'),
+				COD_FLG:  getRefVal('ORDER_SEG','COD_FLG'),
+				ORD_FRTRTE:  getRefVal('ORDER_SEG','ORD_FRTRTE'),
+				BCO_FLG:  getRefVal('ORDER_SEG','BCO_FLG'),
+				SIG_REQ_FLG:  getRefVal('ORDER_SEG','SIG_REQ_FLG'),
+				BILL_FREIGHT_FLG:  getRefVal('ORDER_SEG','BILL_FREIGHT_FLG'),
+				COD_PAYMENT_TYPE:  getRefVal('ORDER_SEG','COD_PAYMENT_TYPE'),
+				PAYMENT_TYPE:  getRefVal('ORDER_SEG','PAYMENT_TYPE'),
+				RMANUM:  getRefVal('ORDER_SEG','RMANUM'),
+				BRCUST:  getRefVal('ORDER_SEG','BRCUST'),
+				BR_HOST_ADR_ID:  getRefVal('ORDER_SEG','BR_HOST_ADR_ID'),
+				COD_IND_TYPE:  getRefVal('ORDER_SEG','COD_IND_TYPE'),
+				CUSTOMS_CLR_FLG:  getRefVal('ORDER_SEG','CUSTOMS_CLR_FLG'),
+				SRV_TYPE:  getRefVal('ORDER_SEG','SRV_TYPE'),
+				CRNCY_CODE:  getRefVal('ORDER_SEG','CRNCY_CODE'),
+				BTO_SEQNUM:  getRefVal('ORDER_SEG','BTO_SEQNUM'),
+				SLOT:  getRefVal('ORDER_SEG','SLOT'),
+				RUSH_FLG:  getRefVal('ORDER_SEG','RUSH_FLG'),
+				DEPTNO:  getRefVal('ORDER_SEG','DEPTNO'),
+				DEST_NUM:  getRefVal('ORDER_SEG','DEST_NUM'),
+				DUTY_PAYMENT_TYPE:  getRefVal('ORDER_SEG','DUTY_PAYMENT_TYPE'),
+				DUTY_PAYMENT_ACCT:  getRefVal('ORDER_SEG','DUTY_PAYMENT_ACCT'),
+				CSTMS_DTYCUST:  getRefVal('ORDER_SEG','CSTMS_DTYCUST'),
+				EXCISE_DTYCUST:  getRefVal('ORDER_SEG','EXCISE_DTYCUST'),
+				CSTMS_ORDTYP:  getRefVal('ORDER_SEG','CSTMS_ORDTYP'),
+				DFLT_ORDLIN_CHG_REACOD:  getRefVal('ORDER_SEG','DFLT_ORDLIN_CHG_REACOD'),
+				PLAN_SLOT_SEQ: getRefVal('ORDER_SEG','PLAN_SLOT_SEQ'),
+				DLVSEQ: getRefVal('ORDER_SEG','DLVSEQ'),
+				DLVNUM:  getRefVal('ORDER_SEG','DLVNUM'),
+				},
+	ORDER_LINE_SEG: {
+				SEGNAM:  getRefVal('ORDER_LINE_SEG','SEGNAM'),
+				ORDNUM:  getRefVal('ORDER_LINE_SEG','ORDNUM'),
+				ORDLIN:  getRefVal('ORDER_LINE_SEG','ORDLIN'),
+				ORDSLN:  getRefVal('ORDER_LINE_SEG','ORDSLN'),
+				SALES_ORDNUM:  getRefVal('ORDER_LINE_SEG','SALES_ORDNUM'),
+				SALES_ORDLIN:  getRefVal('ORDER_LINE_SEG','SALES_ORDLIN'),
+				ENTDTE:  getRefVal('ORDER_LINE_SEG','ENTDTE'),
+				PRTNUM:  getRefVal('ORDER_LINE_SEG','PRTNUM'),
+				PRT_CLIENT_ID:  getRefVal('ORDER_LINE_SEG','PRT_CLIENT_ID'),
+				ORGCOD:  getRefVal('ORDER_LINE_SEG','ORGCOD'),
+				REVLVL:  getRefVal('ORDER_LINE_SEG','REVLVL'),
+				LOTNUM:  getRefVal('ORDER_LINE_SEG','LOTNUM'),
+				SUP_LOTNUM:  getRefVal('ORDER_LINE_SEG','SUP_LOTNUM'),
+				ORDQTY:  getRefVal('ORDER_LINE_SEG','ORDQTY'),
+				MARCOD:  getRefVal('ORDER_LINE_SEG','MARCOD'),
+				PRCPRI:  getRefVal('ORDER_LINE_SEG','PRCPRI'),
+				OVAFLG:  getRefVal('ORDER_LINE_SEG','OVAFLG'),
+				OVPFLG:  getRefVal('ORDER_LINE_SEG','OVPFLG'),
+				RPQFLG:  getRefVal('ORDER_LINE_SEG','RPQFLG'),
+				OVRCOD:  getRefVal('ORDER_LINE_SEG','OVRCOD'),
+				OVRAMT:  getRefVal('ORDER_LINE_SEG','OVRAMT'),
+				STDFLG:  getRefVal('ORDER_LINE_SEG','STDFLG'),
+				PARFLG:  getRefVal('ORDER_LINE_SEG','PARFLG'),
+				BCKFLG:  getRefVal('ORDER_LINE_SEG','BCKFLG'),
+				CARCOD:  getRefVal('ORDER_LINE_SEG','CARCOD'),
+				CARGRP:  getRefVal('ORDER_LINE_SEG','CARGRP'),
+				SRVLVL:  getRefVal('ORDER_LINE_SEG','SRVLVL'),
+				SDDFLG:  getRefVal('ORDER_LINE_SEG','SDDFLG'),
+				FRTCOD:  getRefVal('ORDER_LINE_SEG','FRTCOD'),
+				COOINC:  getRefVal('ORDER_LINE_SEG','COOINC'),
+				COOLST:  getRefVal('ORDER_LINE_SEG','COOLST'),
+				ACCNUM:  getRefVal('ORDER_LINE_SEG','ACCNUM'),
+				PRJNUM:  getRefVal('ORDER_LINE_SEG','PRJNUM'),
+				CSTPRT:  getRefVal('ORDER_LINE_SEG','CSTPRT'),
+				MANFID:  getRefVal('ORDER_LINE_SEG','MANFID'),
+				DEPTNO:  getRefVal('ORDER_LINE_SEG','DEPTNO'),
+				UNTPAK:  getRefVal('ORDER_LINE_SEG','UNTPAK'),
+				UNTPAL:  getRefVal('ORDER_LINE_SEG','UNTPAL'),
+				UNTCAS:  getRefVal('ORDER_LINE_SEG','UNTCAS'),
+				EARLY_SHPDTE:  getRefVal('ORDER_LINE_SEG','EARLY_SHPDTE'),
+				EARLY_DLVDTE:  getRefVal('ORDER_LINE_SEG','EARLY_DLVDTE'),
+				LATE_SHPDTE:  getRefVal('ORDER_LINE_SEG','LATE_SHPDTE'),
+				LATE_DLVDTE:  getRefVal('ORDER_LINE_SEG','LATE_DLVDTE'),
+				SRC_HOST_ADR_ID:  getRefVal('ORDER_LINE_SEG','SRC_HOST_ADR_ID'),
+				RSVPRI:  getRefVal('ORDER_LINE_SEG','RSVPRI'),
+				RSVQTY:  getRefVal('ORDER_LINE_SEG','RSVQTY'),
+				PCKGR1:  getRefVal('ORDER_LINE_SEG','PCKGR1'),
+				PCKGR2:  getRefVal('ORDER_LINE_SEG','PCKGR2'),
+				PCKGR3:  getRefVal('ORDER_LINE_SEG','PCKGR3'),
+				PCKGR4:  getRefVal('ORDER_LINE_SEG','PCKGR4'),
+				DST_MOV_ZONE_ID:  getRefVal('ORDER_LINE_SEG','DST_MOV_ZONE_ID'),
+				DSTLOC:  getRefVal('ORDER_LINE_SEG','DSTLOC'),
+				XDKFLG:  getRefVal('ORDER_LINE_SEG','XDKFLG'),
+				PRT_DL_TYP:  getRefVal('ORDER_LINE_SEG','PRT_DL_TYP'),
+				ATOFLG:  getRefVal('ORDER_LINE_SEG','ATOFLG'),
+				HOST_ORDQTY:  getRefVal('ORDER_LINE_SEG','HOST_ORDQTY'),
+				HSTSTS:  getRefVal('ORDER_LINE_SEG','HSTSTS'),
+				SPLFLG:  getRefVal('ORDER_LINE_SEG','SPLFLG'),
+				FRSFLG:  getRefVal('ORDER_LINE_SEG','FRSFLG'),
+				MIN_SHELF_HRS:  getRefVal('ORDER_LINE_SEG','MIN_SHELF_HRS'),
+				ORDINV:  getRefVal('ORDER_LINE_SEG','ORDINV'),
+				NON_ALC_FLG:  getRefVal('ORDER_LINE_SEG','NON_ALC_FLG'),
+				UNT_PRICE:  getRefVal('ORDER_LINE_SEG','UNT_PRICE'),
+				WAVE_SET:  getRefVal('ORDER_LINE_SEG','WAVE_SET'),
+				CRNCY_NAME:  getRefVal('ORDER_LINE_SEG','CRNCY_NAME'),
+				TOT_PLN_MISC_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_MISC_QTY'),
+				TOT_PLN_MISC2_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_MISC2_QTY'),
+				ALC_SEARCH_PATH:  getRefVal('ORDER_LINE_SEG','ALC_SEARCH_PATH'),
+				SUPNUM:  getRefVal('ORDER_LINE_SEG','SUPNUM'),
+				CRNCY_CODE:  getRefVal('ORDER_LINE_SEG','CRNCY_CODE'),
+				BTO_COMCOD:  getRefVal('ORDER_LINE_SEG','BTO_COMCOD'),
+				BTO_DLV_SEQ:  getRefVal('ORDER_LINE_SEG','BTO_DLV_SEQ'),
+				BTO_STATION:  getRefVal('ORDER_LINE_SEG','BTO_STATION'),
+				BTO_SIDE:  getRefVal('ORDER_LINE_SEG','BTO_SIDE'),
+				BTO_BAY:  getRefVal('ORDER_LINE_SEG','BTO_BAY'),
+				FTPCOD:  getRefVal('ORDER_LINE_SEG','FTPCOD'),
+				ABS_ORDINV_WIN:  getRefVal('ORDER_LINE_SEG','ABS_ORDINV_WIN'),
+				ABS_ORDINV_CODE:  getRefVal('ORDER_LINE_SEG','ABS_ORDINV_CODE'),
+				PAYTRM:  getRefVal('ORDER_LINE_SEG','PAYTRM'),
+				SED_EXPORT_TYP:  getRefVal('ORDER_LINE_SEG','SED_EXPORT_TYP'),
+				COONUM:  getRefVal('ORDER_LINE_SEG','COONUM'),
+				COOTYP:  getRefVal('ORDER_LINE_SEG','COOTYP'),
+				ECCN:  getRefVal('ORDER_LINE_SEG','ECCN'),
+				EXPLICEXCPT:  getRefVal('ORDER_LINE_SEG','EXPLICEXCPT'),
+				EXPLICEXPDTE:  getRefVal('ORDER_LINE_SEG','EXPLICEXPDTE'),
+				EXPLICNUM:  getRefVal('ORDER_LINE_SEG','EXPLICNUM'),
+				IMPLICEXCPT:  getRefVal('ORDER_LINE_SEG','IMPLICEXCPT'),
+				IMPLICEXPDTE:  getRefVal('ORDER_LINE_SEG','IMPLICEXPDTE'),
+				IMPLICNUM:  getRefVal('ORDER_LINE_SEG','IMPLICNUM'),
+				MARKSNUMBERS:  getRefVal('ORDER_LINE_SEG','MARKSNUMBERS'),
+				NAFTABEGDTE:  getRefVal('ORDER_LINE_SEG','NAFTABEGDTE'),
+				NAFTAENDDTE:  getRefVal('ORDER_LINE_SEG','NAFTAENDDTE'),
+				NAFTA_PREF_CRIT:  getRefVal('ORDER_LINE_SEG','NAFTA_PREF_CRIT'),
+				NAFTA_PRODUCER:  getRefVal('ORDER_LINE_SEG','NAFTA_PRODUCER'),
+				SEDFLG:  getRefVal('ORDER_LINE_SEG','SEDFLG'),
+				TRADEAGREETYP:  getRefVal('ORDER_LINE_SEG','TRADEAGREETYP'),
+				EXPORT_TYP:  getRefVal('ORDER_LINE_SEG','EXPORT_TYP'),
+				RULE_NAM:  getRefVal('ORDER_LINE_SEG','RULE_NAM'),
+				MANDTE:  getRefVal('ORDER_LINE_SEG','MANDTE'),
+				EXPIRE_DTE:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE'),
+				MANDTE_FMT:  getRefVal('ORDER_LINE_SEG','MANDTE_FMT'),
+				MANDTE_FMTVAL:  getRefVal('ORDER_LINE_SEG','MANDTE_FMTVAL'),
+				EXPIRE_DTE_FMT:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE_FMT'),
+				EXPIRE_DTE_FMTVAL:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE_FMTVAL'),
+				DISTRO_ID:  getRefVal('ORDER_LINE_SEG','DISTRO_ID'),
+				SOURCE_WH:  getRefVal('ORDER_LINE_SEG','SOURCE_WH'),
+				SOURCE_DISTRO_ID:  getRefVal('ORDER_LINE_SEG','SOURCE_DISTRO_ID'),
+				SOURCE_WH_HOST_EXT_ID:  getRefVal('ORDER_LINE_SEG','SOURCE_WH_HOST_EXT_ID'),
+				PROMO_COD:  getRefVal('ORDER_LINE_SEG','PROMO_COD'),
+				INVNUM:  getRefVal('ORDER_LINE_SEG','INVNUM'),
+				SUPNUM_DISTRO:  getRefVal('ORDER_LINE_SEG','SUPNUM_DISTRO'),
+				TRKNUM:  getRefVal('ORDER_LINE_SEG','TRKNUM'),
+				INVLIN:  getRefVal('ORDER_LINE_SEG','INVLIN'),
+				INVSLN:  getRefVal('ORDER_LINE_SEG','INVSLN'),
+				STO_ALC_FLG:  getRefVal('ORDER_LINE_SEG','STO_ALC_FLG'),
+				ORG_DISTRO_ID:  getRefVal('ORDER_LINE_SEG','ORG_DISTRO_ID'),
+				INV_ATTR_STR1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR1'),
+				INV_ATTR_STR2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR2'),
+				INV_ATTR_STR3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR3'),
+				INV_ATTR_STR4:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR4'),
+				INV_ATTR_STR5:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR5'),
+				INV_ATTR_STR6:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR6'),
+				INV_ATTR_STR7:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR7'),
+				INV_ATTR_STR8:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR8'),
+				INV_ATTR_STR9:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR9'),
+				INV_ATTR_STR10:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR10'),
+				INV_ATTR_STR11:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR11'),
+				INV_ATTR_STR12:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR12'),
+				INV_ATTR_STR13:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR13'),
+				INV_ATTR_STR14:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR14'),
+				INV_ATTR_STR15:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR15'),
+				INV_ATTR_STR16:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR16'),
+				INV_ATTR_STR17:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR17'),
+				INV_ATTR_STR18:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR18'),
+				INV_ATTR_INT1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT1'),
+				INV_ATTR_INT2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT2'),
+				INV_ATTR_INT3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT3'),
+				INV_ATTR_INT4:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT4'),
+				INV_ATTR_INT5:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT5'),
+				INV_ATTR_FLT1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT1'),
+				INV_ATTR_FLT2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT2'),
+				INV_ATTR_FLT3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT3'),
+				INV_ATTR_DTE1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1'),
+				INV_ATTR_DTE1_FMT:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1_FMT'),
+				INV_ATTR_DTE1_FMTVAL:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1_FMTVAL'),
+				INV_ATTR_DTE2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2'),
+				INV_ATTR_DTE2_FMT:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2_FMT'),
+				INV_ATTR_DTE2_FMTVAL:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2_FMTVAL'),
+				ALLOW_OVRSHPFLG:  getRefVal('ORDER_LINE_SEG','ALLOW_OVRSHPFLG'),
+				DISTRO_TYP:  getRefVal('ORDER_LINE_SEG','DISTRO_TYP'),
+				ORDLIN_CHG_REACOD:  getRefVal('ORDER_LINE_SEG','ORDLIN_CHG_REACOD'),
+				REACOD_CMNT:  getRefVal('ORDER_LINE_SEG','REACOD_CMNT'),
+				ASSET_TYP:  getRefVal('ORDER_LINE_SEG','ASSET_TYP'),
+				LOAD_ATTR1_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR1_CFG'),
+				LOAD_ATTR2_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR2_CFG'),
+				LOAD_ATTR3_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR3_CFG'),
+				LOAD_ATTR4_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR4_CFG'),
+				LOAD_ATTR5_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR5_CFG'),
+				CANCELLED_FLG:  getRefVal('ORDER_LINE_SEG','CANCELLED_FLG'),
+				TOT_PLN_CUBE:  getRefVal('ORDER_LINE_SEG','TOT_PLN_CUBE'),
+				TOT_PLN_WGT:  getRefVal('ORDER_LINE_SEG','TOT_PLN_WGT'),
+				TOT_PLN_CAS_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_CAS_QTY'),
+				TOT_PLN_PAL_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_PAL_QTY'),
+				BLK_SLOT_ONLY_FLG: getRefVal('ORDER_LINE_SEG','BLK_SLOT_ONLY_FLG'),
+				},
+	ORDER_LINE_SEG_SKU: {
+				INVSTS:  getRefVal('ORDER_LINE_SEG','INVSTS','SKU'),
+				INVSTS_PRG:  getRefVal('ORDER_LINE_SEG','INVSTS_PRG','SKU')
+		}
+	
+]
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Transfer_CrossRefValues" doc:id="0f104440-3850-4308-9120-6780566eaace" variableName="Transfer_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_RCPT_TRANSFER" doc:id="67ada1c7-1ca1-4948-8452-20bcde7519c9" >
+		<os:retrieve doc:name="Retrieve" doc:id="bb2c7c6d-e49f-4a55-b865-cf63785cd139" key="#['CrossRefValues' ++ p('GetCrossRef.RCPT')]" objectStore="Object_store_mms_wms_Rcpt" target="RefDtl">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"PO_Transfer_Receive_CrossRef" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="879dbd9a-c5c0-4699-aac5-a303d9844a9e" >
+			<when expression="#[sizeOf(payload)== 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="922afd22-64fd-4bb4-93c6-af8a4a8914a4" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="ecd4b383-a024-4da5-a4a4-b3eaa95303aa" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="40cbddb3-35c5-4083-a305-d2738e62cd8b" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.PO_Transfer_Receive_CrossRef]" doc:name="PO_Transfer_Receive_CrossRefValues" doc:id="5bd2cdd4-708d-47a0-b980-988d27b1e078" variableName="PO_Transfer_Receive_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="2885c47a-c230-4cd1-8892-e1bd4caecbb4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.PO_Transfer_Receive_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.PO_Transfer_Receive_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		SUPPPRE: getRefVal('SUPPLIER','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENT_ID: getRefVal('ENVIRONMENT','CLIENT_ID'),
+		ATRTYP: getRefVal('STOREZONE','ATTRIBUTE_TYPE_ID'),
+		SUBATRTYP: getRefVal('STOREZONE','SUB_ATTRIBUTE_TYPE')
+	},
+	CTRL_SEG: {
+		TRNNAM: getRefVal('CNTRL_SEG','TRNNAM'),
+		TRNVER: getRefVal('CNTRL_SEG','TRNVER'),
+		WHSE_ID: getRefVal('CNTRL_SEG','WHSE_ID')
+		},
+	RCPT_TRLR_SEG: {
+		SEGNAM: getRefVal('RCPT_TRLR_SEG','SEGNAM'),
+		CARCOD: getRefVal('RCPT_TRLR_SEG','CARCOD'),
+		TRLR_STAT: getRefVal('RCPT_TRLR_SEG','TRLR_STAT'),
+		TRLR_TYP: getRefVal('RCPT_TRLR_SEG','TRLR_TYP'),
+		TRLR_SIZE: getRefVal('RCPT_TRLR_SEG','TRLR_SIZE'),
+		REFRIG_FLG: getRefVal('RCPT_TRLR_SEG','REFRIG_FLG'),
+		TRLR_BROKER: getRefVal('RCPT_TRLR_SEG','TRLR_BROKER'),
+		AUTOGEN_FLG: getRefVal('RCPT_TRLR_SEG','AUTOGEN_FLG'),
+		HOT_FLG: getRefVal('RCPT_TRLR_SEG','HOT_FLG'),
+		TRLR_COD: getRefVal('RCPT_TRLR_SEG','TRLR_COD'),
+		TURN_FLG: getRefVal('RCPT_TRLR_SEG','TURN_FLG'),
+		TUTN_FLG: getRefVal('RCPT_TRLR_SEG','TUTN_FLG'),
+		DELV_FLG: getRefVal('RCPT_TRLR_SEG','DELV_FLG'),
+		APPT_ID: getRefVal('RCPT_TRLR_SEG','APPT_ID'),
+		CLIENT_ID: getRefVal('CLIENT_ID','CLIENT_ID'),
+		PAL_SLOT_FLG: getRefVal('RCPT_TRLR_SEG','PAL_SLOT_FLG'),
+		LIVE_LOAD_FLG: getRefVal('RCPT_TRLR_SEG','LIVE_LOAD_FLG')
+		},
+	RCPT_TRUCK_SEG: {
+		SEGNAM: getRefVal('RCPT_TRUCK_SEG','SEGNAM'),
+		TRKSTS: getRefVal('RCPT_TRUCK_SEG','TRKSTS'),
+		TRNSPT: getRefVal('RCPT_TRUCK_SEG','TRNSPT'),
+		RCVDCK: getRefVal('RCPT_TRUCK_SEG','RCVDCK'),
+		DEVCOD: getRefVal('RCPT_TRUCK_SEG','DEVCOD'),
+		LBLFLG: getRefVal('RCPT_TRUCK_SEG','LBLFLG'),
+		ARECOD: getRefVal('RCPT_TRUCK_SEG','ARECOD'),
+		IGNORE_INV_FLG: getRefVal('RCPT_TRUCK_SEG','IGNORE_INV_FLG'),
+		CARCOD: getRefVal('RCPT_TRUCK_SEG','CARCOD'),
+		CRNCY_CODE: getRefVal('RCPT_TRUCK_SEG','CRNCY_CODE')
+		},
+	RCPT_INVOICE_SEG: {
+		SEGNAM: getRefVal('RCPT_INVOICE_SEG','SEGNAM'),
+		CLIENT_ID: getRefVal('CLIENT_ID','CLIENT_ID'),
+		INVTYP: getRefVal('RCPT_INVOICE_SEG','INVTYP'),
+		SADNUM: getRefVal('RCPT_INVOICE_SEG','SADNUM')
+		},
+				
+	RCPT_LINE_SEG: {
+		SEGNAM: getRefVal('RCPT_LINE_SEG','SEGNAM'),
+		INVSLN: getRefVal('RCPT_LINE_SEG','INVSLN'),
+		PRTNUM: getRefVal('RCPT_LINE_SEG','PRTNUM'),
+		RCVSTS: getRefVal('RCPT_LINE_SEG','RCVSTS'),
+		RETCOD: getRefVal('RCPT_LINE_SEG','RETCOD'),
+		EDTFLG: getRefVal('RCPT_LINE_SEG','EDTFLG'),
+		CNSG_FLG: getRefVal('RCPT_LINE_SEG','CNSG_FLG'),
+		DISTRO_OVRFLG: getRefVal('RCPT_LINE_SEG','DISTRO_OVRFLG'),
+		},
+//	RCPT_LINE_SEG_BOX: {
+//		SEGNAM: getRefVal('RCPT_LINE_SEG','SEGNAM','BOX'),
+//		INVLIN: getRefVal('RCPT_LINE_SEG','INVLIN','BOX'),
+//		INVSLN: getRefVal('RCPT_LINE_SEG','INVSLN','BOX'),
+//		PRTNUM: getRefVal('RCPT_LINE_SEG','PRTNUM','BOX'),
+//		RCVSTS: getRefVal('RCPT_LINE_SEG','RCVSTS','BOX'),
+//		RETCOD: getRefVal('RCPT_LINE_SEG','RETCOD','BOX'),
+//		EDTFLG: getRefVal('RCPT_LINE_SEG','EDTFLG','BOX'),
+//		CNSG_FLG: getRefVal('RCPT_LINE_SEG','CNSG_FLG','BOX'),
+//		DISTRO_OVRFLG: getRefVal('RCPT_LINE_SEG','DISTRO_OVRFLG','BOX'),
+//		INV_ATTR_STR16: getRefVal('RCPT_LINE_SEG','INV_ATTR_STR16','BOX')
+//		},		
+	RCPT_ASN_SEG: {
+		SEGNAM: getRefVal('RCPT_ASN_SEG','SEGNAM'),
+		PRTNUM: getRefVal('RCPT_ASN_SEG','PRTNUM'),
+		INVSTS: getRefVal('RCPT_ASN_SEG','INVSTS'),
+		USR_ID: getRefVal('RCPT_ASN_SEG','USR_ID'),
+		PLAT_ID: getRefVal('RCPT_ASN_SEG','PLAT_ID'),
+		CNSG_FLG: getRefVal('RCPT_ASN_SEG','CNSG_FLG'),
+		INVLIN: getRefVal('RCPT_ASN_SEG','INVLIN'),
+		INVSLN: getRefVal('RCPT_ASN_SEG','INVSLN'),
+		SSCC_PREFIX_FLG: getRefVal('RCPT_ASN_SEG','SSCC_PREFIX_FLG')
+		}
+//	RCPT_ASN_SEG_BOX: {
+//		SEGNAM: getRefVal('RCPT_ASN_SEG','SEGNAM','BOX'),
+//		PRTNUM: getRefVal('RCPT_ASN_SEG','PRTNUM','BOX'),
+//		UNTQTY: getRefVal('RCPT_ASN_SEG','UNTQTY','BOX'),
+//		INVSTS: getRefVal('RCPT_ASN_SEG','INVSTS','BOX'),
+//		USR_ID: getRefVal('RCPT_ASN_SEG','USR_ID','BOX'),
+//		PLAT_ID: getRefVal('RCPT_ASN_SEG','PLAT_ID','BOX'),
+//		CNSG_FLG: getRefVal('RCPT_ASN_SEG','CNSG_FLG','BOX'),
+//		INVLIN: getRefVal('RCPT_ASN_SEG','INVLIN','BOX'),
+//		INVSLN: getRefVal('RCPT_ASN_SEG','INVSLN','BOX'),
+//		INV_ATTR_STR16: getRefVal('RCPT_ASN_SEG','INV_ATTR_STR16','BOX'),
+//		SSCC_PREFIX_FLG: getRefVal('RCPT_ASN_SEG','SSCC_PREFIX_FLG','BOX')
+//		}	
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="PO_Transfer_Receive_CrossRefValues" doc:id="4c06bc3f-d638-466f-b2a0-d66d6820edbb" variableName="PO_Transfer_Receive_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_RCPT_CROSS_DOCK" doc:id="5f26747a-085f-451a-b6d5-fb3698d00cc0" >
+		<os:retrieve doc:name="Retrieve" doc:id="17dbe865-e8f8-4721-8bdb-870005f2e3b6" key="#['CrossRefValues' ++ p('GetCrossRef.RCPTCROSSDOCK')]" target="RefDtl" objectStore="Object_store_mms_wms_PoAsn">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"PO_ASN_XDock_CrossRef" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="ed129298-fabb-47d7-a0b9-ce8ca7e9915e" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="9a0618bb-c872-49a4-b1dc-3bba9bc29510" name="GetCrossRef_2"/>
+				<logger level="INFO" doc:name="Logger" doc:id="885c47c6-2ba7-4d70-bb5d-3955e2f1ede8" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']"/>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="b5e1f24a-a016-41b7-93be-3a57172e6ec6" message="#['\n\t Retrieved Cross Reference Values from Object Store']"/>
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.PO_ASN_XDock_CrossRef]" doc:name="PO_ASN_CrossDock_CrossRefValues" doc:id="7d029a69-de8e-46c4-a873-f72e0c2c7e4d" variableName="PO_ASN_CrossDock_CrossRefValues" />
+		<ee:transform doc:name="Transform Message" doc:id="6ebbcea3-55ba-4b24-9079-bbb6db64553d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.PO_ASN_CrossDock_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.PO_ASN_CrossDock_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENT_ID: getRefVal('ENVIRONMENT','CLIENT_ID'),
+		ATRTYP: getRefVal('STOREZONE','ATTRIBUTE_TYPE_ID'),
+		SUBATRTYP: getRefVal('STOREZONE','SUB_ATTRIBUTE_TYPE')
+	},
+	CTRL_SEG: {
+		TRNNAM: getRefVal('CNTRL_SEG','TRNNAM'),
+		TRNVER: getRefVal('CNTRL_SEG','TRNVER'),
+		WHSE_ID: getRefVal('CNTRL_SEG','WHSE_ID')
+		},
+	RCPT_TRLR_SEG: {
+		SEGNAM: getRefVal('RCPT_TRLR_SEG','SEGNAM'),
+		CARCOD: getRefVal('RCPT_TRLR_SEG','CARCOD'),
+		TRLR_STAT: getRefVal('RCPT_TRLR_SEG','TRLR_STAT'),
+		TRLR_TYP: getRefVal('RCPT_TRLR_SEG','TRLR_TYP'),
+		TRLR_SIZE: getRefVal('RCPT_TRLR_SEG','TRLR_SIZE'),
+		REFRIG_FLG: getRefVal('RCPT_TRLR_SEG','REFRIG_FLG'),
+		TRLR_BROKER: getRefVal('RCPT_TRLR_SEG','TRLR_BROKER'),
+		AUTOGEN_FLG: getRefVal('RCPT_TRLR_SEG','AUTOGEN_FLG'),
+		HOT_FLG: getRefVal('RCPT_TRLR_SEG','HOT_FLG'),
+		TRLR_COD: getRefVal('RCPT_TRLR_SEG','TRLR_COD'),
+		TURN_FLG: getRefVal('RCPT_TRLR_SEG','TURN_FLG'),
+		TUTN_FLG: getRefVal('RCPT_TRLR_SEG','TUTN_FLG'),
+		DELV_FLG: getRefVal('RCPT_TRLR_SEG','DELV_FLG'),
+		APPT_ID: getRefVal('RCPT_TRLR_SEG','APPT_ID'),
+		CLIENT_ID: getRefVal('CLIENT_ID','CLIENT_ID'),
+		PAL_SLOT_FLG: getRefVal('RCPT_TRLR_SEG','PAL_SLOT_FLG'),
+		LIVE_LOAD_FLG: getRefVal('RCPT_TRLR_SEG','LIVE_LOAD_FLG')
+		},
+	RCPT_TRUCK_SEG: {
+		SEGNAM: getRefVal('RCPT_TRUCK_SEG','SEGNAM'),
+		TRKSTS: getRefVal('RCPT_TRUCK_SEG','TRKSTS'),
+		TRNSPT: getRefVal('RCPT_TRUCK_SEG','TRNSPT'),
+		RCVDCK: getRefVal('RCPT_TRUCK_SEG','RCVDCK'),
+		DEVCOD: getRefVal('RCPT_TRUCK_SEG','DEVCOD'),
+		LBLFLG: getRefVal('RCPT_TRUCK_SEG','LBLFLG'),
+		ARECOD: getRefVal('RCPT_TRUCK_SEG','ARECOD'),
+		IGNORE_INV_FLG: getRefVal('RCPT_TRUCK_SEG','IGNORE_INV_FLG'),
+		CARCOD: getRefVal('RCPT_TRUCK_SEG','CARCOD'),
+		CRNCY_CODE: getRefVal('RCPT_TRUCK_SEG','CRNCY_CODE')
+		},
+	RCPT_INVOICE_SEG: {
+		SEGNAM: getRefVal('RCPT_INVOICE_SEG','SEGNAM'),
+		CLIENT_ID: getRefVal('CLIENT_ID','CLIENT_ID'),
+		INVTYP: getRefVal('RCPT_INVOICE_SEG','INVTYP'),
+		SADNUM: getRefVal('RCPT_INVOICE_SEG','SADNUM')
+		},
+				
+	RCPT_LINE_SEG: {
+		SEGNAM: getRefVal('RCPT_LINE_SEG','SEGNAM'),
+		INVSLN: getRefVal('RCPT_LINE_SEG','INVSLN'),
+		PRTNUM: getRefVal('RCPT_LINE_SEG','PRTNUM'),
+		RCVSTS: getRefVal('RCPT_LINE_SEG','RCVSTS'),
+		RETCOD: getRefVal('RCPT_LINE_SEG','RETCOD'),
+		EDTFLG: getRefVal('RCPT_LINE_SEG','EDTFLG'),
+		CNSG_FLG: getRefVal('RCPT_LINE_SEG','CNSG_FLG'),
+		DISTRO_OVRFLG: getRefVal('RCPT_LINE_SEG','DISTRO_OVRFLG')
+		},
+	
+	RCPT_ASN_SEG: {
+		SEGNAM: getRefVal('RCPT_ASN_SEG','SEGNAM'),
+		PRTNUM: getRefVal('RCPT_ASN_SEG','PRTNUM'),
+		UNTQTY: getRefVal('RCPT_ASN_SEG','UNTQTY'),
+		INVSTS: getRefVal('RCPT_ASN_SEG','INVSTS'),
+		USR_ID: getRefVal('RCPT_ASN_SEG','USR_ID'),
+		PLAT_ID: getRefVal('RCPT_ASN_SEG','PLAT_ID'),
+		CNSG_FLG: getRefVal('RCPT_ASN_SEG','CNSG_FLG'),
+		INVLIN: getRefVal('RCPT_ASN_SEG','INVLIN'),
+		INVSLN: getRefVal('RCPT_ASN_SEG','INVSLN'),
+		INV_ATTR_STR16: getRefVal('RCPT_ASN_SEG','INV_ATTR_STR16'),
+		SSCC_PREFIX_FLG: getRefVal('RCPT_ASN_SEG','SSCC_PREFIX_FLG')
+		}	
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="PO_ASN_CrossDock_CrossRefValues" doc:id="9b713b26-6532-42d9-a024-4df8fce0dea0" variableName="PO_ASN_CrossDock_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_RCPT_SINGLE_LOC_PO" doc:id="9da59d21-52cd-4b7d-abad-ea86a2451b32" >
+		<os:retrieve doc:name="Retrieve" doc:id="1844df66-6154-4c8c-b949-a5e9e275996b" key="#['CrossRefValues' ++ p('GetCrossRef.SINGLELOCPO')]" target="RefDtl" objectStore="Object_store_mms_wms_PoSingleLoc">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"PO_Single_Loc_CrossRef" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="02d9b7e1-7ceb-436f-8d02-ab6e90470770" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="47787d64-60c5-4b24-acc9-ddd3c83650e8" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="260277bc-8acb-4616-8078-03cf8f8388fa" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="28eaccd8-44c3-41b3-9e99-390011cc3159" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.PO_Single_Loc_CrossRef]" doc:name="PO_Single_Loc_CrossRefValues" doc:id="247313a3-7d4a-4043-917b-cee76be52b64" variableName="PO_Single_Loc_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="e96a2c8b-706d-46f6-b7ed-9bfc5e180ed0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.PO_Single_Loc_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.PO_Single_Loc_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENT_ID: getRefVal('ENVIRONMENT','CLIENT_ID')
+	},
+	CTRL_SEG: {
+		TRNNAM: getRefVal('CNTRL_SEG','TRNNAM'),
+		TRNVER: getRefVal('CNTRL_SEG','TRNVER'),
+		WHSE_ID: getRefVal('CNTRL_SEG','WHSE_ID')
+		},
+	HEADER_SEG:{
+		SEGNAM:  getRefVal('HEADER_SEG', 'SEGNAM'),
+		TRNTYP:  getRefVal('HEADER_SEG', 'TRNTYP'),
+		INVNUM:  getRefVal('HEADER_SEG', 'INVNUM'),
+		SUPNUM:  getRefVal('HEADER_SEG', 'SUPNUM'),
+		CLIENT_ID:  getRefVal('HEADER_SEG', 'CLIENT_ID'),
+		RIMSTS:  getRefVal('HEADER_SEG', 'RIMSTS'),
+		INVTYP:  getRefVal('HEADER_SEG', 'INVTYP'),
+		INVDTE:  getRefVal('HEADER_SEG', 'INVDTE'),
+		ORGREF:  getRefVal('HEADER_SEG', 'ORGREF'),
+		SADNUM:  getRefVal('HEADER_SEG', 'SADNUM'),
+		WAYBIL:  getRefVal('HEADER_SEG', 'WAYBIL'),
+		CSTMS_TYP:  getRefVal('HEADER_SEG', 'CSTMS_TYP'),
+		},
+	LINE_SEG: {
+		SEGNAM:  getRefVal('LINE_SEG', 'SEGNAM'),
+		INVLIN:  getRefVal('LINE_SEG', 'INVLIN'),
+		INVSLN:  getRefVal('LINE_SEG', 'INVSLN'),
+		EXPQTY:  getRefVal('LINE_SEG', 'EXPQTY'),
+		PRTNUM:  getRefVal('LINE_SEG', 'PRTNUM'),
+		ORGCOD:  getRefVal('LINE_SEG', 'ORGCOD'),
+		REVLVL:  getRefVal('LINE_SEG', 'REVLVL'),
+		LOTNUM:  getRefVal('LINE_SEG', 'LOTNUM'),
+		SUP_LOTNUM:  getRefVal('LINE_SEG', 'SUP_LOTNUM'),
+		TOHSTA:  getRefVal('LINE_SEG', 'TOHSTA'),
+		RETCOD:  getRefVal('LINE_SEG', 'RETCOD'),
+		RCVSTS:  getRefVal('LINE_SEG', 'RCVSTS'),
+		EXP_CATCH_QTY:  getRefVal('LINE_SEG', 'EXP_CATCH_QTY'),
+		MANDTE:  getRefVal('LINE_SEG', 'MANDTE'),
+		MANDTE_FMT:  getRefVal('LINE_SEG', 'MANDTE_FMT'),
+		MANDTE_FMTVAL:  getRefVal('LINE_SEG', 'MANDTE_FMTVAL'),
+		EXPIRE_DTE:  getRefVal('LINE_SEG', 'EXPIRE_DTE'),
+		EXPIRE_DTE_FMT:  getRefVal('LINE_SEG', 'EXPIRE_DTE_FMT'),
+		EXPIRE_DTE_FMTVAL:  getRefVal('LINE_SEG', 'EXPIRE_DTE_FMTVAL'),
+		DISTRO_OVRFLG:  getRefVal('LINE_SEG', 'DISTRO_OVRFLG'),
+		INV_ATTR_STR1:  getRefVal('LINE_SEG', 'INV_ATTR_STR1'),
+		INV_ATTR_STR2:  getRefVal('LINE_SEG', 'INV_ATTR_STR2'),
+		INV_ATTR_STR3:  getRefVal('LINE_SEG', 'INV_ATTR_STR3'),
+		INV_ATTR_STR4:  getRefVal('LINE_SEG', 'INV_ATTR_STR4'),
+		INV_ATTR_STR5:  getRefVal('LINE_SEG', 'INV_ATTR_STR5'),
+		INV_ATTR_STR6:  getRefVal('LINE_SEG', 'INV_ATTR_STR6'),
+		INV_ATTR_STR7:  getRefVal('LINE_SEG', 'INV_ATTR_STR7'),
+		INV_ATTR_STR8:  getRefVal('LINE_SEG', 'INV_ATTR_STR8'),
+		INV_ATTR_STR9:  getRefVal('LINE_SEG', 'INV_ATTR_STR9'),
+		INV_ATTR_STR10:  getRefVal('LINE_SEG', 'INV_ATTR_STR10'),
+		INV_ATTR_STR11:  getRefVal('LINE_SEG', 'INV_ATTR_STR11'),
+		INV_ATTR_STR12:  getRefVal('LINE_SEG', 'INV_ATTR_STR12'),
+		INV_ATTR_STR13:  getRefVal('LINE_SEG', 'INV_ATTR_STR13'),
+		INV_ATTR_STR14:  getRefVal('LINE_SEG', 'INV_ATTR_STR14'),
+		INV_ATTR_STR15:  getRefVal('LINE_SEG', 'INV_ATTR_STR15'),
+		INV_ATTR_STR16:  getRefVal('LINE_SEG', 'INV_ATTR_STR16'),
+		INV_ATTR_STR17:  getRefVal('LINE_SEG', 'INV_ATTR_STR17'),
+		INV_ATTR_STR18:  getRefVal('LINE_SEG', 'INV_ATTR_STR18'),
+		INV_ATTR_INT1:  getRefVal('LINE_SEG', 'INV_ATTR_INT1'),
+		INV_ATTR_INT2:  getRefVal('LINE_SEG', 'INV_ATTR_INT2'),
+		INV_ATTR_INT3:  getRefVal('LINE_SEG', 'INV_ATTR_INT3'),
+		INV_ATTR_INT4:  getRefVal('LINE_SEG', 'INV_ATTR_INT4'),
+		INV_ATTR_INT5:  getRefVal('LINE_SEG', 'INV_ATTR_INT5'),
+		INV_ATTR_FLT1:  getRefVal('LINE_SEG', 'INV_ATTR_FLT1'),
+		INV_ATTR_FLT2:  getRefVal('LINE_SEG', 'INV_ATTR_FLT2'),
+		INV_ATTR_FLT3:  getRefVal('LINE_SEG', 'INV_ATTR_FLT3'),
+		INV_ATTR_DTE1:  getRefVal('LINE_SEG', 'INV_ATTR_DTE1'),
+		INV_ATTR_DTE1_FMT:  getRefVal('LINE_SEG', 'INV_ATTR_DTE1_FMT'),
+		INV_ATTR_DTE1_FMTVAL:  getRefVal('LINE_SEG', 'INV_ATTR_DTE1_FMTVAL'),
+		INV_ATTR_DTE2:  getRefVal('LINE_SEG', 'INV_ATTR_DTE2'),
+		INV_ATTR_DTE2_FMT:  getRefVal('LINE_SEG', 'INV_ATTR_DTE2_FMT'),
+		INV_ATTR_DTE2_FMTVAL:  getRefVal('LINE_SEG', 'INV_ATTR_DTE2_FMTVAL'),
+		CSTMS_TYP:  getRefVal('LINE_SEG', 'CSTMS_TYP'),
+		CSTMS_CMMDTY_COD:  getRefVal('LINE_SEG', 'CSTMS_CMMDTY_COD'),
+		CSTMS_VAT_COD:  getRefVal('LINE_SEG', 'CSTMS_VAT_COD'),
+		DFLT_ORGCOD:  getRefVal('LINE_SEG', 'DFLT_ORGCOD'),
+		DTY_STMP_TRK_FLG:  getRefVal('LINE_SEG', 'DTY_STMP_TRK_FLG'),
+		CSTMS_CST:  getRefVal('LINE_SEG', 'CSTMS_CST'),
+		CSTMS_CRNCY:  getRefVal('LINE_SEG', 'CSTMS_CRNCY'),
+		}	
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="PO_Single_Loc_CrossRefValues" doc:id="0d966c6f-2384-4a1f-974e-953b35ef0691" variableName="PO_Single_Loc_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_RTV_ORDER" doc:id="ef62f2ed-bc96-49b9-af74-cd97d0dce4f4" >
+		<os:retrieve doc:name="Retrieve" doc:id="9b08368b-12fb-4fc4-93fb-d378ab6b3c9d" key="#['CrossRefValues' ++ p('GetCrossRef.RTV')]" target="RefDtl" objectStore="Object_store_mms_wms_Rtv">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Rtv_CrossRef" : ''
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="6b89a43c-2d3e-43f1-9e26-5c4198f91193" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="f3267157-9956-4b13-bd88-dd472c61b5b0" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="bf3aa500-c651-40a6-a236-638668847830" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="789fe1da-8e66-46c4-8526-f687eb10b7f1" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Rtv_CrossRef]" doc:name="Rtv_CrossRefValues" doc:id="4fbcefa7-b114-4a6b-8870-f58e043a7ca7" variableName="Rtv_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="2fb90bf0-49e8-4837-8bd9-822899cca34c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn='everywhere'
+var valuesList 					= vars.Rtv_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.Rtv_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		SUPPPRE: getRefVal('SUPPLIER','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENT_ID: getRefVal('ENVIRONMENT','CLIENT_ID'),
+		ATRTYP: getRefVal('STOREZONE','ATTRIBUTE_TYPE_ID'),
+		SUBATRTYP: getRefVal('STOREZONE','SUB_ATTRIBUTE_TYPE')
+		
+		},
+	CTRL_SEG: {
+		TRNNAM: getRefVal('CNTRL_SEG','TRNNAM'),
+		TRNVER: getRefVal('CNTRL_SEG','TRNVER')
+		},
+		
+	ORDER_SEG: {
+				SEGNAM:  getRefVal('ORDER_SEG','SEGNAM'),
+				TRNTYP:  getRefVal('ORDER_SEG','TRNTYP'),
+				CLIENT_ID:  getRefVal('ORDER_SEG','CLIENT_ID'),
+				ORDNUM:  getRefVal('ORDER_SEG','ORDNUM'),
+				ORDTYP:  getRefVal('ORDER_SEG','ORDTYP'),
+				ENTDTE:  getRefVal('ORDER_SEG','ENTDTE'),
+				STCUST:  getRefVal('ORDER_SEG','STCUST'),
+				ST_HOST_ADR_ID:  getRefVal('ORDER_SEG','ST_HOST_ADR_ID'),
+				RTCUST:  getRefVal('ORDER_SEG','RTCUST'),
+				RT_HOST_ADR_ID:  getRefVal('ORDER_SEG','RT_HOST_ADR_ID'),
+				BTCUST:  getRefVal('ORDER_SEG','BTCUST'),
+				BT_HOST_ADR_ID:  getRefVal('ORDER_SEG','BT_HOST_ADR_ID'),
+				CPONUM:  getRefVal('ORDER_SEG','CPONUM'),
+				CPODTE:  getRefVal('ORDER_SEG','CPODTE'),
+				CPOTYP:  getRefVal('ORDER_SEG','CPOTYP'),
+				PAYTRM:  getRefVal('ORDER_SEG','PAYTRM'),
+				CARFLG:  getRefVal('ORDER_SEG','CARFLG'),
+				SHIPBY:  getRefVal('ORDER_SEG','SHIPBY'),
+				RRLFLG:  getRefVal('ORDER_SEG','RRLFLG'),
+				WAVE_FLG:  getRefVal('ORDER_SEG','WAVE_FLG'),
+				REQUIR_TMS_FLG:  getRefVal('ORDER_SEG','REQUIR_TMS_FLG'),
+				COD_FLG:  getRefVal('ORDER_SEG','COD_FLG'),
+				ORD_FRTRTE:  getRefVal('ORDER_SEG','ORD_FRTRTE'),
+				BCO_FLG:  getRefVal('ORDER_SEG','BCO_FLG'),
+				SIG_REQ_FLG:  getRefVal('ORDER_SEG','SIG_REQ_FLG'),
+				BILL_FREIGHT_FLG:  getRefVal('ORDER_SEG','BILL_FREIGHT_FLG'),
+				COD_PAYMENT_TYPE:  getRefVal('ORDER_SEG','COD_PAYMENT_TYPE'),
+				PAYMENT_TYPE:  getRefVal('ORDER_SEG','PAYMENT_TYPE'),
+				RMANUM:  getRefVal('ORDER_SEG','RMANUM'),
+				BRCUST:  getRefVal('ORDER_SEG','BRCUST'),
+				BR_HOST_ADR_ID:  getRefVal('ORDER_SEG','BR_HOST_ADR_ID'),
+				COD_IND_TYPE:  getRefVal('ORDER_SEG','COD_IND_TYPE'),
+				CUSTOMS_CLR_FLG:  getRefVal('ORDER_SEG','CUSTOMS_CLR_FLG'),
+				SRV_TYPE:  getRefVal('ORDER_SEG','SRV_TYPE'),
+				CRNCY_CODE:  getRefVal('ORDER_SEG','CRNCY_CODE'),
+				BTO_SEQNUM:  getRefVal('ORDER_SEG','BTO_SEQNUM'),
+				SLOT:  getRefVal('ORDER_SEG','SLOT'),
+				RUSH_FLG:  getRefVal('ORDER_SEG','RUSH_FLG'),
+				DEPTNO:  getRefVal('ORDER_SEG','DEPTNO'),
+				DEST_NUM:  getRefVal('ORDER_SEG','DEST_NUM'),
+				DUTY_PAYMENT_TYPE:  getRefVal('ORDER_SEG','DUTY_PAYMENT_TYPE'),
+				DUTY_PAYMENT_ACCT:  getRefVal('ORDER_SEG','DUTY_PAYMENT_ACCT'),
+				CSTMS_DTYCUST:  getRefVal('ORDER_SEG','CSTMS_DTYCUST'),
+				EXCISE_DTYCUST:  getRefVal('ORDER_SEG','EXCISE_DTYCUST'),
+				CSTMS_ORDTYP:  getRefVal('ORDER_SEG','CSTMS_ORDTYP'),
+				DFLT_ORDLIN_CHG_REACOD:  getRefVal('ORDER_SEG','DFLT_ORDLIN_CHG_REACOD'),
+				PLAN_SLOT_SEQ: getRefVal('ORDER_SEG','PLAN_SLOT_SEQ'),
+				DLVSEQ: getRefVal('ORDER_SEG','DLVSEQ'),
+				DLVNUM:  getRefVal('ORDER_SEG','DLVNUM'),
+				},
+	ORDER_LINE_SEG: {
+				SEGNAM:  getRefVal('ORDER_LINE_SEG','SEGNAM'),
+				ORDNUM:  getRefVal('ORDER_LINE_SEG','ORDNUM'),
+				ORDLIN:  getRefVal('ORDER_LINE_SEG','ORDLIN'),
+				ORDSLN:  getRefVal('ORDER_LINE_SEG','ORDSLN'),
+				SALES_ORDNUM:  getRefVal('ORDER_LINE_SEG','SALES_ORDNUM'),
+				SALES_ORDLIN:  getRefVal('ORDER_LINE_SEG','SALES_ORDLIN'),
+				ENTDTE:  getRefVal('ORDER_LINE_SEG','ENTDTE'),
+				PRTNUM:  getRefVal('ORDER_LINE_SEG','PRTNUM'),
+				PRT_CLIENT_ID:  getRefVal('ORDER_LINE_SEG','PRT_CLIENT_ID'),
+				ORGCOD:  getRefVal('ORDER_LINE_SEG','ORGCOD'),
+				REVLVL:  getRefVal('ORDER_LINE_SEG','REVLVL'),
+				LOTNUM:  getRefVal('ORDER_LINE_SEG','LOTNUM'),
+				SUP_LOTNUM:  getRefVal('ORDER_LINE_SEG','SUP_LOTNUM'),
+				ORDQTY:  getRefVal('ORDER_LINE_SEG','ORDQTY'),
+				MARCOD:  getRefVal('ORDER_LINE_SEG','MARCOD'),
+				PRCPRI:  getRefVal('ORDER_LINE_SEG','PRCPRI'),
+				OVAFLG:  getRefVal('ORDER_LINE_SEG','OVAFLG'),
+				OVPFLG:  getRefVal('ORDER_LINE_SEG','OVPFLG'),
+				RPQFLG:  getRefVal('ORDER_LINE_SEG','RPQFLG'),
+				OVRCOD:  getRefVal('ORDER_LINE_SEG','OVRCOD'),
+				OVRAMT:  getRefVal('ORDER_LINE_SEG','OVRAMT'),
+				STDFLG:  getRefVal('ORDER_LINE_SEG','STDFLG'),
+				PARFLG:  getRefVal('ORDER_LINE_SEG','PARFLG'),
+				BCKFLG:  getRefVal('ORDER_LINE_SEG','BCKFLG'),
+				CARCOD:  getRefVal('ORDER_LINE_SEG','CARCOD'),
+				CARGRP:  getRefVal('ORDER_LINE_SEG','CARGRP'),
+				SRVLVL:  getRefVal('ORDER_LINE_SEG','SRVLVL'),
+				SDDFLG:  getRefVal('ORDER_LINE_SEG','SDDFLG'),
+				FRTCOD:  getRefVal('ORDER_LINE_SEG','FRTCOD'),
+				COOINC:  getRefVal('ORDER_LINE_SEG','COOINC'),
+				COOLST:  getRefVal('ORDER_LINE_SEG','COOLST'),
+				ACCNUM:  getRefVal('ORDER_LINE_SEG','ACCNUM'),
+				PRJNUM:  getRefVal('ORDER_LINE_SEG','PRJNUM'),
+				CSTPRT:  getRefVal('ORDER_LINE_SEG','CSTPRT'),
+				MANFID:  getRefVal('ORDER_LINE_SEG','MANFID'),
+				DEPTNO:  getRefVal('ORDER_LINE_SEG','DEPTNO'),
+				UNTPAK:  getRefVal('ORDER_LINE_SEG','UNTPAK'),
+				UNTPAL:  getRefVal('ORDER_LINE_SEG','UNTPAL'),
+				UNTCAS:  getRefVal('ORDER_LINE_SEG','UNTCAS'),
+				EARLY_SHPDTE:  getRefVal('ORDER_LINE_SEG','EARLY_SHPDTE'),
+				EARLY_DLVDTE:  getRefVal('ORDER_LINE_SEG','EARLY_DLVDTE'),
+				LATE_SHPDTE:  getRefVal('ORDER_LINE_SEG','LATE_SHPDTE'),
+				LATE_DLVDTE:  getRefVal('ORDER_LINE_SEG','LATE_DLVDTE'),
+				SRC_HOST_ADR_ID:  getRefVal('ORDER_LINE_SEG','SRC_HOST_ADR_ID'),
+				RSVPRI:  getRefVal('ORDER_LINE_SEG','RSVPRI'),
+				RSVQTY:  getRefVal('ORDER_LINE_SEG','RSVQTY'),
+				PCKGR1:  getRefVal('ORDER_LINE_SEG','PCKGR1'),
+				PCKGR2:  getRefVal('ORDER_LINE_SEG','PCKGR2'),
+				PCKGR3:  getRefVal('ORDER_LINE_SEG','PCKGR3'),
+				PCKGR4:  getRefVal('ORDER_LINE_SEG','PCKGR4'),
+				DST_MOV_ZONE_ID:  getRefVal('ORDER_LINE_SEG','DST_MOV_ZONE_ID'),
+				DSTLOC:  getRefVal('ORDER_LINE_SEG','DSTLOC'),
+				XDKFLG:  getRefVal('ORDER_LINE_SEG','XDKFLG'),
+				PRT_DL_TYP:  getRefVal('ORDER_LINE_SEG','PRT_DL_TYP'),
+				ATOFLG:  getRefVal('ORDER_LINE_SEG','ATOFLG'),
+				HOST_ORDQTY:  getRefVal('ORDER_LINE_SEG','HOST_ORDQTY'),
+				HSTSTS:  getRefVal('ORDER_LINE_SEG','HSTSTS'),
+				SPLFLG:  getRefVal('ORDER_LINE_SEG','SPLFLG'),
+				FRSFLG:  getRefVal('ORDER_LINE_SEG','FRSFLG'),
+				MIN_SHELF_HRS:  getRefVal('ORDER_LINE_SEG','MIN_SHELF_HRS'),
+				ORDINV:  getRefVal('ORDER_LINE_SEG','ORDINV'),
+				NON_ALC_FLG:  getRefVal('ORDER_LINE_SEG','NON_ALC_FLG'),
+				UNT_PRICE:  getRefVal('ORDER_LINE_SEG','UNT_PRICE'),
+				WAVE_SET:  getRefVal('ORDER_LINE_SEG','WAVE_SET'),
+				CRNCY_NAME:  getRefVal('ORDER_LINE_SEG','CRNCY_NAME'),
+				TOT_PLN_MISC_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_MISC_QTY'),
+				TOT_PLN_MISC2_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_MISC2_QTY'),
+				ALC_SEARCH_PATH:  getRefVal('ORDER_LINE_SEG','ALC_SEARCH_PATH'),
+				SUPNUM:  getRefVal('ORDER_LINE_SEG','SUPNUM'),
+				CRNCY_CODE:  getRefVal('ORDER_LINE_SEG','CRNCY_CODE'),
+				BTO_COMCOD:  getRefVal('ORDER_LINE_SEG','BTO_COMCOD'),
+				BTO_DLV_SEQ:  getRefVal('ORDER_LINE_SEG','BTO_DLV_SEQ'),
+				BTO_STATION:  getRefVal('ORDER_LINE_SEG','BTO_STATION'),
+				BTO_SIDE:  getRefVal('ORDER_LINE_SEG','BTO_SIDE'),
+				BTO_BAY:  getRefVal('ORDER_LINE_SEG','BTO_BAY'),
+				FTPCOD:  getRefVal('ORDER_LINE_SEG','FTPCOD'),
+				ABS_ORDINV_WIN:  getRefVal('ORDER_LINE_SEG','ABS_ORDINV_WIN'),
+				ABS_ORDINV_CODE:  getRefVal('ORDER_LINE_SEG','ABS_ORDINV_CODE'),
+				PAYTRM:  getRefVal('ORDER_LINE_SEG','PAYTRM'),
+				SED_EXPORT_TYP:  getRefVal('ORDER_LINE_SEG','SED_EXPORT_TYP'),
+				COONUM:  getRefVal('ORDER_LINE_SEG','COONUM'),
+				COOTYP:  getRefVal('ORDER_LINE_SEG','COOTYP'),
+				ECCN:  getRefVal('ORDER_LINE_SEG','ECCN'),
+				EXPLICEXCPT:  getRefVal('ORDER_LINE_SEG','EXPLICEXCPT'),
+				EXPLICEXPDTE:  getRefVal('ORDER_LINE_SEG','EXPLICEXPDTE'),
+				EXPLICNUM:  getRefVal('ORDER_LINE_SEG','EXPLICNUM'),
+				IMPLICEXCPT:  getRefVal('ORDER_LINE_SEG','IMPLICEXCPT'),
+				IMPLICEXPDTE:  getRefVal('ORDER_LINE_SEG','IMPLICEXPDTE'),
+				IMPLICNUM:  getRefVal('ORDER_LINE_SEG','IMPLICNUM'),
+				MARKSNUMBERS:  getRefVal('ORDER_LINE_SEG','MARKSNUMBERS'),
+				NAFTABEGDTE:  getRefVal('ORDER_LINE_SEG','NAFTABEGDTE'),
+				NAFTAENDDTE:  getRefVal('ORDER_LINE_SEG','NAFTAENDDTE'),
+				NAFTA_PREF_CRIT:  getRefVal('ORDER_LINE_SEG','NAFTA_PREF_CRIT'),
+				NAFTA_PRODUCER:  getRefVal('ORDER_LINE_SEG','NAFTA_PRODUCER'),
+				SEDFLG:  getRefVal('ORDER_LINE_SEG','SEDFLG'),
+				TRADEAGREETYP:  getRefVal('ORDER_LINE_SEG','TRADEAGREETYP'),
+				EXPORT_TYP:  getRefVal('ORDER_LINE_SEG','EXPORT_TYP'),
+				RULE_NAM:  getRefVal('ORDER_LINE_SEG','RULE_NAM'),
+				MANDTE:  getRefVal('ORDER_LINE_SEG','MANDTE'),
+				EXPIRE_DTE:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE'),
+				MANDTE_FMT:  getRefVal('ORDER_LINE_SEG','MANDTE_FMT'),
+				MANDTE_FMTVAL:  getRefVal('ORDER_LINE_SEG','MANDTE_FMTVAL'),
+				EXPIRE_DTE_FMT:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE_FMT'),
+				EXPIRE_DTE_FMTVAL:  getRefVal('ORDER_LINE_SEG','EXPIRE_DTE_FMTVAL'),
+				DISTRO_ID:  getRefVal('ORDER_LINE_SEG','DISTRO_ID'),
+				SOURCE_WH:  getRefVal('ORDER_LINE_SEG','SOURCE_WH'),
+				SOURCE_DISTRO_ID:  getRefVal('ORDER_LINE_SEG','SOURCE_DISTRO_ID'),
+				SOURCE_WH_HOST_EXT_ID:  getRefVal('ORDER_LINE_SEG','SOURCE_WH_HOST_EXT_ID'),
+				PROMO_COD:  getRefVal('ORDER_LINE_SEG','PROMO_COD'),
+				INVNUM:  getRefVal('ORDER_LINE_SEG','INVNUM'),
+				SUPNUM_DISTRO:  getRefVal('ORDER_LINE_SEG','SUPNUM_DISTRO'),
+				TRKNUM:  getRefVal('ORDER_LINE_SEG','TRKNUM'),
+				INVLIN:  getRefVal('ORDER_LINE_SEG','INVLIN'),
+				INVSLN:  getRefVal('ORDER_LINE_SEG','INVSLN'),
+				STO_ALC_FLG:  getRefVal('ORDER_LINE_SEG','STO_ALC_FLG'),
+				ORG_DISTRO_ID:  getRefVal('ORDER_LINE_SEG','ORG_DISTRO_ID'),
+				INV_ATTR_STR1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR1'),
+				INV_ATTR_STR2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR2'),
+				INV_ATTR_STR3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR3'),
+				INV_ATTR_STR4:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR4'),
+				INV_ATTR_STR5:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR5'),
+				INV_ATTR_STR6:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR6'),
+				INV_ATTR_STR7:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR7'),
+				INV_ATTR_STR8:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR8'),
+				INV_ATTR_STR9:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR9'),
+				INV_ATTR_STR10:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR10'),
+				INV_ATTR_STR11:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR11'),
+				INV_ATTR_STR12:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR12'),
+				INV_ATTR_STR13:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR13'),
+				INV_ATTR_STR14:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR14'),
+				INV_ATTR_STR15:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR15'),
+				INV_ATTR_STR16:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR16'),
+				INV_ATTR_STR17:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR17'),
+				INV_ATTR_STR18:  getRefVal('ORDER_LINE_SEG','INV_ATTR_STR18'),
+				INV_ATTR_INT1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT1'),
+				INV_ATTR_INT2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT2'),
+				INV_ATTR_INT3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT3'),
+				INV_ATTR_INT4:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT4'),
+				INV_ATTR_INT5:  getRefVal('ORDER_LINE_SEG','INV_ATTR_INT5'),
+				INV_ATTR_FLT1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT1'),
+				INV_ATTR_FLT2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT2'),
+				INV_ATTR_FLT3:  getRefVal('ORDER_LINE_SEG','INV_ATTR_FLT3'),
+				INV_ATTR_DTE1:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1'),
+				INV_ATTR_DTE1_FMT:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1_FMT'),
+				INV_ATTR_DTE1_FMTVAL:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE1_FMTVAL'),
+				INV_ATTR_DTE2:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2'),
+				INV_ATTR_DTE2_FMT:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2_FMT'),
+				INV_ATTR_DTE2_FMTVAL:  getRefVal('ORDER_LINE_SEG','INV_ATTR_DTE2_FMTVAL'),
+				ALLOW_OVRSHPFLG:  getRefVal('ORDER_LINE_SEG','ALLOW_OVRSHPFLG'),
+				DISTRO_TYP:  getRefVal('ORDER_LINE_SEG','DISTRO_TYP'),
+				ORDLIN_CHG_REACOD:  getRefVal('ORDER_LINE_SEG','ORDLIN_CHG_REACOD'),
+				REACOD_CMNT:  getRefVal('ORDER_LINE_SEG','REACOD_CMNT'),
+				ASSET_TYP:  getRefVal('ORDER_LINE_SEG','ASSET_TYP'),
+				LOAD_ATTR1_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR1_CFG'),
+				LOAD_ATTR2_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR2_CFG'),
+				LOAD_ATTR3_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR3_CFG'),
+				LOAD_ATTR4_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR4_CFG'),
+				LOAD_ATTR5_CFG:  getRefVal('ORDER_LINE_SEG','LOAD_ATTR5_CFG'),
+				CANCELLED_FLG:  getRefVal('ORDER_LINE_SEG','CANCELLED_FLG'),
+				TOT_PLN_CUBE:  getRefVal('ORDER_LINE_SEG','TOT_PLN_CUBE'),
+				TOT_PLN_WGT:  getRefVal('ORDER_LINE_SEG','TOT_PLN_WGT'),
+				TOT_PLN_CAS_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_CAS_QTY'),
+				TOT_PLN_PAL_QTY:  getRefVal('ORDER_LINE_SEG','TOT_PLN_PAL_QTY'),
+				BLK_SLOT_ONLY_FLG: getRefVal('ORDER_LINE_SEG','BLK_SLOT_ONLY_FLG'),
+				},
+	ORDER_LINE_SEG_SKU: {
+				INVSTS:  getRefVal('ORDER_LINE_SEG','INVSTS','SKU'),
+				INVSTS_PRG:  getRefVal('ORDER_LINE_SEG','INVSTS_PRG','SKU')
+		}
+	
+]
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Rtv_CrossRefValues" doc:id="be2c0656-0b79-4e05-b2d9-37b1e700ef9e" variableName="Rtv_CrossRefValues"/>
+	</sub-flow>
+	<sub-flow name="getCrossRef_STORE_INB" doc:id="4378bc10-7caf-4266-a63d-6f0da95aa9c3" >
+		<os:retrieve doc:name="Retrieve" doc:id="98c1ff0e-4f59-4475-b34b-b8aa87d00b71" key="#['CrossRefValues' ++ p('GetCrossRef.STOREINB')]" target="RefDtl" objectStore="Object_store_mms_wms_StoreInb">
+			<os:default-value ><![CDATA[#[output application/json
+---
+{
+	"Store_INB_Ref" : '',
+}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="3547d3ea-cb19-46a2-8460-0ee129d9453a" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<flow-ref doc:name="New-GetCrossRef" doc:id="bcb2e97d-0031-40aa-b62c-c75c82bc54e3" name="GetCrossRef_2" />
+				<logger level="INFO" doc:name="Logger" doc:id="bee07ead-07fe-40f5-ba91-b982eb4b2f13" message="#['\n\t Retrieved Cross Reference Values from Get Cross Directory']" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="f982c851-dcf6-47c4-8b68-86f2104b9870" message="#['\n\t Retrieved Cross Reference Values from Object Store']" />
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.RefDtl.Store_INB_Ref]" doc:name="STORE_INB_CrossRefValues" doc:id="9b8787ee-41e6-413c-9fb0-39fb902d1d5f" variableName="STORE_INB_CrossRefValues"/>
+		<ee:transform doc:name="Transform Message" doc:id="af418d08-14da-4bc9-97a6-dbee485aa287" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn = 'everywhere'
+var valuesList 				= vars.STORE_INB_CrossRefValues.CrossRef
+fun getRefVal(Ref1,Ref2,Ref3) 	= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_' ++ trim(Ref3)]
+fun getRefVal(Ref1,Ref2)		= valuesList[trim(Ref1) ++ '_' ++ trim(Ref2) ++ '_']
+---
+[
+	WHSE_ID: vars.STORE_INB_CrossRefValues.DFTWHS,
+	HOSTMAP:{
+		STRPRE: getRefVal('STORE','PREFIX'),
+		STRZNPRE: getRefVal('STOREZONE','PREFIX'),
+		VENDORPRE: getRefVal('VENDOR','PREFIX'),
+		DCTODCPRE: getRefVal('WAREHOUSE','PREFIX'),
+		CLIENTID: getRefVal('ENVIRONMENT','CLIENT_ID')
+	},
+
+	CNTRL_SEG: {
+		TRANNAM :getRefVal('CNTRL_SEG','TRANNAM'),
+		TRANVER :getRefVal('CNTRL_SEG','TRANVER'),
+		WHSE_ID :getRefVal('CNTRL_SEG','WHSE_ID')
+	},
+	STORE_STAGING_LOCATION_SEG: {
+		SEGNAM:  getRefVal('STORE_STAGING_LOCATION_SEG', 'SEGNAM'),
+		SRTSEQ:  getRefVal('STORE_STAGING_LOCATION_SEG', 'SRTSEQ'),
+		DST_MOV_ZONE_ID:  getRefVal('STORE_STAGING_LOCATION_SEG', 'DST_MOV_ZONE_ID'),
+		DSTLOC:  getRefVal('STORE_STAGING_LOCATION_SEG', 'DSTLOC'),
+		SRC_BLDG_ID:  getRefVal('STORE_STAGING_LOCATION_SEG', 'SRC_BLDG_ID')
+	},
+	STORE_SCHEDULE_SEG: {
+		SEGNAM:  getRefVal('STORE_SCHEDULE_SEG', 'SEGNAM'),
+		ROUTE_ID:  getRefVal('STORE_SCHEDULE_SEG', 'ROUTE_ID'),
+		BEGDAYCOD:  getRefVal('STORE_SCHEDULE_SEG', 'BEGDAYCOD'),
+		BEGTIM:  getRefVal('STORE_SCHEDULE_SEG', 'BEGTIM'),
+		ENDDAYCOD:  getRefVal('STORE_SCHEDULE_SEG', 'ENDDAYCOD'),
+		ENDTIM:  getRefVal('STORE_SCHEDULE_SEG', 'ENDTIM'),
+		STOP_SEQ:  getRefVal('STORE_SCHEDULE_SEG', 'STOP_SEQ')
+	},
+	STORE_PUT_TO_LOCATION_SEG: {
+		SEGNAM:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'SEGNAM'),
+		SRTSEQ:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'SRTSEQ'),
+		ARECOD:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'ARECOD'),
+		DEPT_COD:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'DEPT_COD'),
+		STOLOC:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'STOLOC'),
+		LODFLG:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'LODFLG'),
+		SUBFLG:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'SUBFLG'),
+		DTLFLG:  getRefVal('STORE_PUT_TO_LOCATION_SEG', 'DTLFLG'),
+		SEGNAM:  getRefVal('STORE_PUT_TO_LOC_FIELD_SEG', 'SEGNAM'),
+		COLNAM:  getRefVal('STORE_PUT_TO_LOC_FIELD_SEG', 'COLNAM'),
+		COLVAL:  getRefVal('STORE_PUT_TO_LOC_FIELD_SEG', 'COLVAL')
+	},
+	STORE_SEG: {
+		SEGNAM:  getRefVal('STORE_SEG', 'SEGNAM'),
+		TRNTYP:  getRefVal('STORE_SEG', 'TRNTYP'),
+		CSTNUM:  getRefVal('STORE_SEG', 'CSTNUM'),
+		CLIENT_ID:  getRefVal('STORE_SEG', 'CLIENT_ID'),
+		PRCPRI:  getRefVal('STORE_SEG', 'PRCPRI'),
+		STORE_TYP:  getRefVal('STORE_SEG', 'STORE_TYP'),
+		STORE_GRP:  getRefVal('STORE_SEG', 'STORE_GRP'),
+		RTCUST:  getRefVal('STORE_SEG', 'RTCUST'),
+		BTCUST:  getRefVal('STORE_SEG', 'BTCUST'),
+		LNGDSC:  getRefVal('STORE_SEG', 'LNGDSC'),
+		HOST_ADR_ID:  getRefVal('STORE_SEG', 'HOST_ADR_ID')
+	},
+	ADDR_SEG: {
+		SEGNAM:  getRefVal('ADDR_SEG', 'SEGNAM'),
+		TRNTYP:  getRefVal('ADDR_SEG', 'TRNTYP'),
+		CLIENT_ID:  getRefVal('ADDR_SEG', 'CLIENT_ID'),
+		ADRNAM:  getRefVal('ADDR_SEG', 'ADRNAM'),
+		ADRTYP:  getRefVal('ADDR_SEG', 'ADRTYP'),
+		ADRLN1:  getRefVal('ADDR_SEG', 'ADRLN1'),
+		ADRLN2:  getRefVal('ADDR_SEG', 'ADRLN2'),
+		ADRLN3:  getRefVal('ADDR_SEG', 'ADRLN3'),
+		ADRCTY:  getRefVal('ADDR_SEG', 'ADRCTY'),
+		ADRSTC:  getRefVal('ADDR_SEG', 'ADRSTC'),
+		ADRPSZ:  getRefVal('ADDR_SEG', 'ADRPSZ'),
+		CTRY_NAME:  getRefVal('ADDR_SEG', 'CTRY_NAME'),
+		RGNCOD:  getRefVal('ADDR_SEG', 'RGNCOD'),
+		PHNNUM:  getRefVal('ADDR_SEG', 'PHNNUM'),
+		FAXNUM:  getRefVal('ADDR_SEG', 'FAXNUM'),
+		RSAFLG:  getRefVal('ADDR_SEG', 'RSAFLG'),
+		TEMP_FLG:  getRefVal('ADDR_SEG', 'TEMP_FLG'),
+		LAST_NAME:  getRefVal('ADDR_SEG', 'LAST_NAME'),
+		FIRST_NAME:  getRefVal('ADDR_SEG', 'FIRST_NAME'),
+		HONORIFIC:  getRefVal('ADDR_SEG', 'HONORIFIC'),
+		ADR_DISTRICT:  getRefVal('ADDR_SEG', 'ADR_DISTRICT'),
+		WEB_ADR:  getRefVal('ADDR_SEG', 'WEB_ADR'),
+		EMAIL_ADR:  getRefVal('ADDR_SEG', 'EMAIL_ADR'),
+		PAGNUM:  getRefVal('ADDR_SEG', 'PAGNUM'),
+		LOCALE_ID:  getRefVal('ADDR_SEG', 'LOCALE_ID'),
+		ATTN_NAME:  getRefVal('ADDR_SEG', 'ATTN_NAME'),
+		ATTN_TEL:  getRefVal('ADDR_SEG', 'ATTN_TEL'),
+		CONT_NAME:  getRefVal('ADDR_SEG', 'CONT_NAME'),
+		CONT_TEL:  getRefVal('ADDR_SEG', 'CONT_TEL'),
+		CONT_TITLE:  getRefVal('ADDR_SEG', 'CONT_TITLE'),
+		PO_BOX_FLG:  getRefVal('ADDR_SEG', 'PO_BOX_FLG'),
+		HOST_EXT_ID:  getRefVal('ADDR_SEG', 'HOST_EXT_ID')
+	}	
+				
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="STORE_INB_CrossRefValues" doc:id="02e73d2d-365c-4d1c-9624-9a21e542c8e2" variableName="STORE_INB_CrossRefValues"/>
+	</sub-flow>
+</mule>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+<sub-flow name="Inbound_Inv_Reconc_Flow" doc:id="d3230098-fae0-4dda-a65d-beb983310636" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="4d127c79-1ccb-4f78-ba07-762c7828dff0" variableName="Action"/>
+		<flow-ref doc:name="Store XML to Message Store" doc:id="cb93d16e-6f63-493e-9d65-3fceaca17f07" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="a22bc5cf-bf85-402b-8bd2-3ae1f86eb8c4" message="#['\n\t stored XML into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="99d37817-373c-4fd7-8cef-5d09b84c2af1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+RawData:
+       (payload...*INVENTORY_RECONCILIATION_SEG map ( val , idx) -> {
+        
+               	WMITRN : val.TRNNUM as Number,
+                WMICRD : (val.TRNDTE)[2 to 7] as Number,
+                WMICRT : (val.TRNDTE)[8 to 13] as Number,
+                WMIMUID: uuid(),
+                WMIFIL : if (sizeOf(vars.Global.FileName) > 50) vars.Global.FileName[0 to 49] else vars.Global.FileName ,
+// 				WMIWID : if (trim(val.INV_ATTR_STR2 default '') == '') 905 else val.INV_ATTR_STR2 as Number,
+ 				WMIWID : 0,
+       			WMIIST : val.INVSTS,
+       			WMIVPN : val.PRTNUM,
+    			WMIUOM : val.STKUOM,
+				WMIQTY : val.UNTQTY,
+				WMIHLD : val.HLD_FLG
+		})             
+}
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="39282ec3-474a-42f2-8fab-d04f634b4463" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var Head = (payload.RawData orderBy $.WMITRN groupBy $.WMITRN) pluck $
+var Det = payload.RawData
+
+---
+{
+WMSIRH: { ( Head map (Hdr,Hdrindex) ->{
+           	WMITRN : Hdr[0].WMITRN,
+            WMICST : '',
+            WMICRD : Hdr[0].WMICRD,
+            WMICRT : Hdr[0].WMICRT,
+            WMIMUID: Hdr[0].WMIMUID,
+            WMIFIL : Hdr[0].WMIFIL,
+            WMIERR : ''
+             }
+            )
+          },
+WMSIRD:  (Det map (val,Detindex) ->{
+        
+               	WMITRN : val.WMITRN,
+                WMICST : '',
+//              WMIWID : val.WMIWID,
+                WMIWID : 0,
+       			WMIIST : val.WMIIST,
+       			WMIVPN : val.WMIVPN,
+    			WMIUOM : val.WMIUOM,
+				WMIQTY : val.WMIQTY,
+				WMIHLD : val.WMIHLD,
+				WMIERR : ''
+				}
+				)
+
+}
+]]></ee:set-payload>
+			
+</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Result" doc:id="3a204c4c-8024-439a-b698-fea25280bd25" variableName="Result"/>
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="83584d36-ea7c-4599-8235-9a6cf36e4303" variableName="Action"/>
+		<set-payload value="#[%dw 2.0 
+output application/csv
+---
+vars.Result.WMSIRD]" doc:name="Set Payload to Detail" doc:id="cd9c417e-b388-483b-b7e4-a5eb0fab1602" />
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+p('InboundMMSWorkFile.InvRecon_Detail') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.csv']" doc:name="Out_FileName" doc:id="78fba55d-1b55-44be-bb29-b19b0df8d667" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+p('InboundMMSWorkFile.InvRecon_Detail') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.trg']" doc:name="Trg_FileName" doc:id="a20f61f5-d93a-4aa6-a05f-51895b3b9eba" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Detail CSV file to Message Store" doc:id="a61a126d-459c-4173-a984-ed1c61937998" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="2d2e59a4-6a27-4f9e-9a25-030e93595c6d" message="#['\n\t stored CSV into message store']"/>
+		<file:write doc:name="Write Detail CSV to MMS Adapter Outbound Folder" doc:id="b1ae5b12-2f89-4538-9de6-5052ef98ee35" config-ref="MMS_Out_config" path="#[vars.Out_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="c7131a2a-897a-40d5-8952-f4415f0ad0b7" message="#['\n\t Written CSV into MMS Outbound Folder']"/>
+		<file:write doc:name="Write trigger file for Detail" doc:id="9df202c1-c520-409b-ba6d-14df7b2b6289" config-ref="MMS_Out_config" path="#[vars.Trg_FileName]"/>
+		<set-payload value="#[%dw 2.0
+output application/csv
+---
+vars.Result.WMSIRH]" doc:name="Set Payload to Header" doc:id="f4d2fa1b-508a-42a4-9976-8fa5773d8602" />
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+p('InboundMMSWorkFile.InvRecon_Header') ++ '_' ++ vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.csv']" doc:name="Out_FileName" doc:id="d4157249-366e-4acc-9543-33f413b96735" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0
+output application/json
+---
+p('InboundMMSWorkFile.InvRecon_Header') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.trg']" doc:name="Trg_FileName" doc:id="3923f455-6a26-4e24-b622-63330fa475e1" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Header CSV to Message Store" doc:id="313be9e7-fffc-41bb-aa8e-3e7f03a328c8" name="MessageStore-Store-ToMMS-Flow"/>
+		<file:write doc:name="Write Header CSV to MMS Adapter Outbound Folder" doc:id="1b5a2073-20c0-444d-aed5-3d5479a11ab1" config-ref="MMS_Out_config" path="#[vars.Out_FileName]"/>
+		<file:write doc:name="Write trigger file for Header" doc:id="418f294e-41a0-4b94-8f06-2cc46dd493e9" config-ref="MMS_Out_config" path="#[vars.Trg_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="9ed212b4-18ce-4c33-94ec-2998e3d65bcd" message="#[vars.Result.Header.WMITRN as String default ' ' ++ 'processed']"/>
+	</sub-flow>
+
+	
+</mule>

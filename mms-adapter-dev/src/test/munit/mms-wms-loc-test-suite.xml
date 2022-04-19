@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-loc-test-suite.xml" />
+	<munit:test name="mms-wms-loc-test-suite-Outbound_Loc_ControlTest" doc:id="b2b4efb0-2c94-4a21-868d-b48d4eafd9af" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_CUST_INB" doc:id="d596f2d3-5da1-4974-9ff3-9104d8e36b46" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_CUST_INB" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="CUST_INB_CrossRefValues" value='#[readUrl("classpath://Outbound/Loc/CUST_INB_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="getCrossRef_SUPP_INB" doc:id="849cece6-a69b-4dc4-b59d-7669968dcf3c" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_SUPP_INB" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="SUPP_INB_CrossRefValues" value='#[readUrl("classpath://Outbound/Loc/SUPP_INB_CrossRefValues.json", "application/json")]' />
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read CSV" doc:id="e7fc92eb-dff2-437a-b302-0193356c152d" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Read CSV" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="0c9feade-9122-4222-9b1a-335b6e30b800" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/Loc/LOC_OUB_WMS_QUA_WST_20201016132902.csv","application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="MessageStore-Store-FromMMS-Flow" doc:id="862739a2-7fec-4dec-8afb-5a635c55d45b" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="e4db52ec-2611-49e9-81b8-843e55bdbe5b" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send To Destinations" doc:id="10e14be7-432c-4217-806c-c535b4d17973" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Send To Destinations" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_Loc_Control" doc:id="66078e92-3495-4315-864b-54bf4e962607" name="Outbound_Loc_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-rtv-test-suite.xml" />
+	<munit:test name="mms-wms-rtv-test-suite-Outbound_Rtv_ControlTest" doc:id="d39b35be-fafe-4da7-a95a-2261b4cde9fc" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_RTV_ORDER" doc:id="0469d50d-e2b4-4ee4-a960-517e03cac7e5" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_RTV_ORDER" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="Rtv_CrossRefValues" value='#[readUrl("classpath://Outbound/Rtv/Rtv_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read Csv" doc:id="af73f1d5-9c9d-4a3c-ba7d-b5ebdc8b0195" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="577c759b-aca4-4629-97c7-48ffa6a5a42f" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/Rtv/RTV_OUB_WMS_QUA_WST_20210104183114316023.csv", "application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="MessageStore-Store-FromMMS-Flow" doc:id="451f71d3-5c54-4140-b760-6e16a9605a1a" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="MessageStore-Store-FromMMS-Flow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send to Destinations" doc:id="90758586-ef81-4fcd-bde6-56cbac2140e0" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_Rtv_Control" doc:id="2dc7a38f-aaa1-4dea-af65-d06770ed8950" name="Outbound_Rtv_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

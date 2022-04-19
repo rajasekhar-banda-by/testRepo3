@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="wms-mms-inv-adj-test-suite.xml" />
+	<munit:test name="wms-mms-inv-adj-test-suite-Inbound_Inv_Adj_FlowTest" doc:id="d26dda19-8bbf-47b7-ab1f-8351080d9553" description="Test">
+		<munit:behavior >
+			<munit:set-event doc:name="Set Event" doc:id="3e1ea95d-eacc-4f71-a2eb-a64098ece733" >
+				<munit:payload value='#[%dw 2.0
+output application/xml
+---
+readUrl("classpath://Inbound/InvAdj/INV_ADJ15071.xml","application/xml") ]' />
+			</munit:set-event>
+			<munit-tools:mock-when doc:name="Store XML to Message Store" doc:id="cf32c76f-cb13-4a52-93cd-d8fc31165ce1" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Store XML to Message Store" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Out_FileName" doc:id="839f8af3-8cb2-47b2-ab2f-2ee82284bd57" processor="set-variable">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="005fc7c5-8513-4ad6-be87-5881d9cb8e5a" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Out_FileName" value="#['INVADJ_INVRCPT_20210204100528645_Detail.csv']" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Trg_FileName" doc:id="fd2aa077-975a-4d5e-9955-737b787d088d" processor="set-variable">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="755ac024-dc84-4c74-843c-a9d99e5d3db0" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Trg_FileName" value="#['INVADJ_INVRCPT_20210204100528645_Detail.trg']" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Store Header CSV to Message Store" doc:id="14890179-82b0-4bbd-972c-6b9369641115" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Store Header CSV to Message Store" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Write Header CSV to MMS Adapter Outbound Folder" doc:id="f19a9532-1c2c-476c-ab99-530fe936d2e4" processor="file:write">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Write Header CSV to MMS Adapter Outbound Folder" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Write trigger file for Header" doc:id="247b020a-c7d0-433d-a339-bccb20dd6d50" processor="file:write">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Write trigger file for Header" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Inbound_Inv_Adj_Flow" doc:id="2ab9d518-a744-4707-8e54-c3a5219063ea" name="Inbound_Inv_Adj_Flow"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

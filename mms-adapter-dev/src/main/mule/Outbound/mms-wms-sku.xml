@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp" xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="Outbound_SkuFlow_Control" doc:id="db2cbf48-4fb8-4980-917e-931d23e89d1b" >
+		<logger level="INFO" doc:name="Logger" doc:id="6a8510db-6934-41bd-b8a4-3bed72f939cb" message="#['\n\t Sku Processing Started']"/>
+		<flow-ref doc:name="getCrossRef_PART_INB" doc:id="5839676a-2abb-4048-8925-0edf6dbf55d6" name="getCrossRef_PART_INB"/>
+		<flow-ref doc:name="Outbound_Sku_Process" doc:id="84a70661-9d19-4420-8711-e1097cbd9115" name="Outbound_Sku_Process" />
+	</flow>
+	<flow name="Outbound_Sku_Process" doc:id="e38ce38b-a011-48ec-8840-76dafd3842ef" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="f768e8c2-942d-48f9-ac30-3f81970bab45" variableName="Action"/>
+		<file:read doc:name="Read" doc:id="dd39e409-84f3-452c-9d2f-cf4d86e3f6f9" path="#[vars.Global.FileName]" outputMimeType="application/csv" config-ref="MMS_In_Config">
+		</file:read>
+		<logger level="INFO" doc:name="Logger" doc:id="346c02af-379e-4a0e-83fc-b96d0b22f25e" message="#['Reading Input File: ' ++ vars.Global.FileName as String default '']"/>
+		<flow-ref doc:name="Store CSV to messageStore" doc:id="16c46a83-1536-4fc1-b586-e789eec89fa3" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="4a6b123e-e525-44e2-bf6b-58cdc9e1ff53" message="#['CSV Stored to message store: ' ++ vars.Global.FileName as String default '']"/>
+		<ee:transform doc:name="Transform Message" doc:id="b1cecd5c-5359-4807-9379-9ec70bf6a9a5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="7ffd2269-a76a-4a73-8221-51808cfa4b6a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+//var skuData = vars.PART_INB_SkuData
+var skuData = payload
+---
+(skuData orderBy $.IVNDPN groupBy $.IVNDPN) pluck $
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="mms-wms-skuBatch_Job" doc:id="8d3307ef-dc9b-406e-a266-157be7def914" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="0fceec4b-17bd-4230-bc93-1a264f1680f1" >
+					<flow-ref doc:name="Flow Reference" doc:id="21c7eef0-9782-45f1-8b16-28b0bd6f413d" name="Outbound_Sku_genSKUxml" />
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="fb875bca-7c52-4c43-b88b-19a7d9a2d58a" >
+				<try doc:name="Try" doc:id="71cbc250-8dcd-4f8a-b25a-2df75367695d" >
+										<set-variable value="#[(now() as String {format:&quot;yyyy-MM-dd'T'HH:mm:ss.SSSSSS&quot;}) as String {format:&quot;yyyy-MM-dd-HH:mm:ss.SSSSSS&quot;}]" doc:name="lastUpdateTime" doc:id="6df53067-4188-4fd2-8de4-80006f7a5a4b" variableName="lastUpdateTime" />
+					<flow-ref doc:name="GenErrorReport" doc:id="2c20a5e7-8e62-4373-9a54-42d8a94310a5" name="GenErrorReport" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="42fe5a91-4f1f-46ac-ba93-9ea5cf917174" >
+							<logger level="DEBUG" doc:name="Logger" doc:id="0c781cb9-ae41-48a0-bc30-42e7ab2f2e55" message="#[vars.global.MMSInstanceName]"/>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="Outbound_Sku_genSKUxml" doc:id="ffbb2835-b4ef-4db7-83f4-af80b2c74732" >
+		<try doc:name="Try" doc:id="0432beaa-05c8-4210-9369-23ff9e6360ab" >
+			<ee:transform doc:name="Transform Message" doc:id="6132d2b2-37c1-4bb9-a9fe-ce0914d6b54d">
+			<ee:message>
+					<ee:set-payload resource="dwl/Outbound/sku.dwl" />
+			</ee:message>
+		</ee:transform>
+			<set-variable value="#[%dw 2.0 
+output application/json
+---
+payload.PART_INB_IFD.CTRL_SEG.PART_SEG.PRTNUM]" doc:name="Sku_Number" doc:id="12dbc226-7ef1-4aac-b688-2293cc768f62" variableName="Sku_Number" />
+			<set-variable value="#[%dw 2.0 output application/json 
+---
+vars.Global.MMSInstanceName as String ++ &quot;_SKU_&quot;++ trim(vars.Sku_Number) as String ++ &quot;_&quot; ++ 
+(now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;}) ++ '.xml']" doc:name="Out_FileName" doc:id="3260ef22-3e3e-4a40-abda-41f02f4a2f25" variableName="Out_FileName" />
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="a05c723e-6910-4907-ac27-0b536c66612a" variableName="Action" />
+			<logger level="INFO" doc:name="Logger" doc:id="38c42a57-4a02-447f-b88d-6d962925db12" message="#['XML Stored to Message Store: ' ++ vars.Out_FileName as String]"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="4b920b04-70cc-459a-ab42-75aa8a3cdfb0" name="MessageStore-Store-FromMMS-Flow" />
+			<logger level="INFO" doc:name="Logger" doc:id="5afad504-0a41-409a-8917-cff5e2bc3b64" message="#['\n\t Stored XML file to Message Store']"/>
+			<flow-ref doc:name="Send To Destinations" doc:id="8a73346c-5b23-436d-b28c-3fe24c6b3baa" name="Outbound_Send_To_Destinations" />
+			<logger level="INFO" doc:name="Logger" doc:id="1c2202fc-ffbc-488c-8f33-f214d5b19079" message="#['XML Published to WMS Inbound Queue: ' ++ vars.Out_FileName as String]"/>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="619c1f15-d8b8-4117-820b-ecf556b7132f" >
+					<logger level="INFO" doc:name="Logger" doc:id="ac3c33a8-41b8-4183-b482-75696b64062d" message="#['Error inside SKu Batch: ' ++ vars.Out_FileName as String]"/>
+					<flow-ref doc:name="GenErrorReport" doc:id="5c2e923b-53f0-4743-964e-f23db945b875" name="GenErrorReport"/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+	
+</sub-flow>
+
+</mule>
+

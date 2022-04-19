@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	
+	<sub-flow name="Inbound_ShipLoad_Flow" doc:id="dbf23f4d-979a-4fb1-98f1-b9c69d32f4e0" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="4b4b597c-3c0b-4a13-b443-438cacc93ec7" variableName="Action"/>
+		<flow-ref doc:name="Store XML to Message Store" doc:id="aca23aec-553d-4707-b51a-5da546cb34ce" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="89cdba8e-ef77-4cef-a5bd-f085bd074c15" message="#['\n\t stored XML into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="dd282cd3-e6ea-486a-92ff-255ab17ff44d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn = "everywhere"
+fun getLoc(Location) = if (Location == "0") "0" else Location[1 to (sizeOf(Location)) -1 ]
+fun getSize(loc) = sizeOf(loc)
+fun getSup(vendor) = vendor[1 to (sizeOf(vendor)) -1 ]
+
+var MuleId = uuid()
+var curDate = now() as String {format: 'yyyyMMdd'}
+var curTime = now() as String {format: 'hhmmss'}
+---
+{
+Header:( 
+	payload...*SHIPMENT_ORDER map (val,idx) ->
+		{
+		WMITRN : payload...MOVE_SEG.TRNNUM[0] as Number,		 
+		WMICST : '',
+		WMICRD : curDate,
+		WMICRT : curTime,
+		WMIMUID: MuleId,
+		WMIFIL : '',
+//		WMIWID : (payload...SHIPMENT_LINE_SEG.SALES_ORDLIN[0] default '905') as Number,
+		WMIWID : if (payload...MOVE_SEG.WH_ID[0] == 'CHAPTER1') '555' as Number else '0' as Number,
+//		WMIORD : if(val.ORDTYP == 'ZRTS') val.ORDNUM[1 to (sizeOf(val.ORDNUM)) -1] else val.ORDNUM,
+// as per ver 4.8, need to get the transfer number from CPONUM, as ORDNUM contains the Customer Order
+
+//PEG-2039 Concatenate WATODN and TRFBCH
+//		WMIORD : if(val.ORDTYP == 'ZRTS') val.CPONUM[1 to (sizeOf(val.CPONUM)) -1] else val.CPONUM,
+		WMIORD : if(val.ORDTYP == 'ZRTS') val.ORDNUM[1 to (sizeOf(val.ORDNUM)) -1] else val.ORDNUM[10 to 17] as Number,
+//		WMIORD : val.ORDNUM[3 to (sizeOf(trim(val.ORDNUM))) - 2 ] as Number,
+//		WMIORD : val.ORDNUM[3 to 8 ] as Number,
+		WMILOC : val.CLIENT_ID, /*pending*/
+		WMITOV : if(val.ORDTYP == 'ZRTS') getSup(val.STCUST default ' ') as Number else 0,
+//		WMITOL : getLoc(val.STCUST default '') as Number,
+
+// PEG-2061 Change SHIP LOAD
+//		WMITOL : if(val.ORDTYP != 'ZRTS') getLoc(val.STCUST default '') as Number else 0,
+		WMITOL : if(val.ORDTYP != 'ZRTS') getLoc(payload...STOP_SEG.HOST_ADR_ID[0] default '') as Number else 0,
+		
+		WMIPRG : '',
+		WMISTS : '',
+		WMIDDT : (payload...MOVE_SEG.DISPATCH_DTE[0][2 to 7] default 0) as Number,
+// PEG-2061 Change SHIP LOAD
+//		WMISID : val.SHIP_ID,
+		WMISID : payload...MOVE_SEG.CAR_MOVE_ID[0],
+		
+//		WMICAR : payload...MOVE_SEG.CAR_MOVE_ID[0],
+		WMITRL : payload...MOVE_SEG.TRLR_NUM[0],
+
+// PEG-2061 Change SHIPLOAD
+//		WMITID : payload...MOVE_SEG.TRLR_ID[0],
+		WMITID : payload...MOVE_SEG.CARCOD[0],
+		WMITYP : val.ORDTYP,
+		WMIERR : ''}
+		),
+		
+Detail:( 
+//		filter (payload...*SHIPMENT_LINE_SEG,(SKUNUM)->(trim(SKUNUM.REQUESTED_INV_ATTR_STR16) != 'LSKU-XD')) map (ShipDtl,idx2) ->
+		payload...*SHIPMENT_ORDER map (ShipHeader,idx) ->
+//		payload...*SHIPMENT_LINE_SEG map (ShipDtl,idx2) ->
+			ShipHeader.*SHIPMENT_LINE_SEG map (ShipDtl,idx2) ->
+//			ShipHeader.*PARCEL_SEG map (ParcelDtl,idx4) ->	
+				ShipDtl.*LOAD_DETAIL_SEG map (LoadDtl,idx3) ->{
+					WMITRN : (payload...MOVE_SEG.TRNNUM[0] default 0) as Number,	
+					WMICRD : curDate,
+					WMICRT : curTime,
+					WMIMUID: MuleId,
+					WMIFIL : '',
+//					WMIWID : (ShipDtl.SALES_ORDLIN default '905') as Number,
+					WMIWID : if (payload...MOVE_SEG.WH_ID[0] == 'CHAPTER1') '555' as Number else '0' as Number,
+//					WMIORD : if(ShipHeader.ORDTYP == 'ZRTS') ShipDtl.ORDNUM[1 to (sizeOf(ShipDtl.ORDNUM)) -1] else ShipDtl.ORDNUM,
+// As per ver 4.8, need to get the transfer number from CPONUM instead of ORDNUM
+//					WMIORD : if(ShipHeader.ORDTYP == 'ZRTS') ShipDtl.CPONUM[1 to (sizeOf(ShipDtl.CPONUM)) -1] else ShipDtl.CPONUM,					
+//PEG-2039 Concatenate WATODN and TRFBCH
+//					WMIORD : if(ShipHeader.ORDTYP == 'ZRTS') ShipHeader.CPONUM[1 to (sizeOf(ShipHeader.CPONUM)) -1] else ShipHeader.CPONUM,										
+					WMIORD : if(ShipHeader.ORDTYP == 'ZRTS') ShipHeader.ORDNUM[1 to (sizeOf(ShipHeader.ORDNUM)) -1] else ShipHeader.ORDNUM[10 to 17] as Number,										
+		//			WMIORD : (ShipDtl.ORDNUM[3 to 8 ]) as Number,
+					WMILOC : ShipDtl.ORD_CLIENT_ID, 
+					WMITOV : if(ShipHeader.ORDTYP == 'ZRTS') getSup(ShipHeader.STCUST default ' ') as Number else 0,
+// PEG-2061 Change SHIPLOAD					
+//					WMITOL : if(ShipHeader.ORDTYP != 'ZRTS') getLoc(ShipHeader.STCUST default '') as Number else 0, 
+					WMITOL : if(ShipHeader.ORDTYP != 'ZRTS') getLoc(payload...STOP_SEG.HOST_ADR_ID[0] default '') as Number else 0,
+					
+//		 			WMISKU : if (payload...*SHIPMENT_ORDER.ORDTYP[0] == 'STSD' or payload...*SHIPMENT_ORDER.ORDTYP[0] == 'STDR' ) (ShipDtl.PART_NUM default 0) as Number   else (ShipDtl.REQUESTED_INV_ATTR_STR16 default 0) as Number, 
+					WMISKU : 0,	
+					WMIVPN : ShipDtl.PART_NUM default '',
+		//			WMIQTY : (ShipDtl.SHP_QTY default 0) as Number,
+					WMIQTY : (LoadDtl.UNTQTY default 0) as Number,
+					WMIPRG : ShipDtl.INVSTS_PRG,
+					WMISTS : ShipDtl.INVSTS,
+//					WMILOD : if (sizeOf(trim(payload...*MOVE_SEG.CAR_MOVE_ID[0][0 to 8] default '')) > 9) payload...*MOVE_SEG.CAR_MOVE_ID[0][0 to 8] else payload...*MOVE_SEG.CAR_MOVE_ID[0] default'',
+//					WMILOD : LoadDtl.SUBNUM[0 to 19]  default '',
+					WMILOD : '',
+//					WMIPAL : if (sizeOf(trim(LoadDtl.SUBNUM default'')) > 9) LoadDtl.SUBNUM[0 to 8] else LoadDtl.SUBNUM default '',
+					WMIPAL : '',
+					WMICAR : if (sizeOf(trim(LoadDtl.LODNUM default'')) > 9) LoadDtl.LODNUM[0 to 8] else LoadDtl.LODNUM default '',
+					WMILPN : if (sizeOf(trim(LoadDtl.SUBNUM default'')) > 20) LoadDtl.SUBNUM[0 to 19] else LoadDtl.SUBNUM default '',
+//					WMITRK : ShipHeader.PARCEL_SEG.TRAKNM,
+// 					WMITRK : ParcelDtl.TRAKNM,
+//                    WMITRK : if (sizeOf(payload ...*PARCEL_SEG) == null) '' 
+//                             else (payload ...*PARCEL_SEG filter ($.SUBNUM ==   LoadDtl.SUBNUM and $.PRTNUM == LoadDtl.PRTNUM and $.ORDNUM == LoadDtl.ORDNUM)).TRAKNM[0]  default '',
+                    WMITRK : ShipHeader.PARCEL_SEG.TRAKNM,
+//					WMILPN : payload...*LOAD_DETAIL_SEG.SUBNUM[0][0 to 19] default '', 
+//					WMICAR : if (sizeOf(trim(LoadDtl.SUBNUM default'')) > 17) LoadDtl.SUBNUM[9 to 17] else LoadDtl.SUBNUM default '',
+		//			WMIPAL : payload...*LOAD_DETAIL_SEG.LODNUM[0][0 to 8] default '',
+		//			WMICAR : payload...*LOAD_DETAIL_SEG.SUBNUM[0][0 to 8] default '',
+					WMIPST : 0 as Number,
+					WMIERR : ''
+		
+		
+				}
+			 
+			
+			
+		)
+						
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="26167e25-72ba-4c6c-8827-5f046d7453b7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+
+var Head = (payload.Header orderBy $.WMIORD distinctBy $.WMIORD)
+var Det =  payload.Detail
+var Det1 = flatten(Det)
+
+// below given code to merge the arrays
+var data = flatten(Det1)
+
+// remove null arrays (if ship line doesn't have load details null array will be populated)
+var ResultInArray = data filter (value, idex) -> (value != null)
+var Result = (ResultInArray orderBy ($.WMIVPN as String) groupBy ($.WMIVPN as String ++ $.WMIPAL default '' ++ $.WMICAR default '')) pluck $
+---
+{
+	Header: Head,
+	Detail: (Result) map {
+		
+		WMITRN 	: $[0].WMITRN,
+		WMICRD 	: $[0].WMICRD,
+		WMICRT 	: $[0].WMICRT,
+		WMIMUID : $[0].WMIMUID,
+		WMIFIL 	: $[0].WMIFIL,
+		WMIWID	: $[0].WMIWID,
+		WMIORD	: $[0].WMIORD,
+		WMILOC	: $[0].WMILOC,
+		WMITOV	: $[0].WMITOV,
+		WMITOL	: $[0].WMITOL,
+		WMISKU  : $[0].WMISKU,
+		WMIVPN	: $[0].WMIVPN,
+		WMIQTY	: sum($..WMIQTY),
+		WMIPRG	: $[0].WMIPRG,
+		WMISTS	: $[0].WMISTS,
+		WMILOD	: $[0].WMILOD,
+		WMIPAL	: $[0].WMIPAL,
+		WMICAR	: $[0].WMICAR,
+		WMILPN  : $[0].WMILPN,
+		WMITRK	: $[0].WMITRK,
+		WMIPST  : $[0].WMIPST,
+		WMIERR	: $[0].WMIERR
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Result" doc:id="54b4e7ed-d5c9-4a4f-829a-62287c7d0df3" variableName="Result"/>
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="da47c560-4f52-4ccf-9c4a-2281895a12c5" variableName="Action"/>
+		<set-payload value="#[%dw 2.0 
+output application/csv
+---
+vars.Result.Detail]" doc:name="Set Payload to Detail" doc:id="a3ae8e36-e6a6-4333-a3a1-598bdee295a7" />
+		<set-variable value="#[%dw 2.0 
+output application/json
+---
+p('InboundMMSWorkFile.ShipLoad_Detail') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.csv']" doc:name="Out_FileName" doc:id="f135997f-790f-4fe9-87a2-715ea4561aa1" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0 
+output application/json
+---
+p('InboundMMSWorkFile.ShipLoad_Detail') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.trg']" doc:name="Trg_FileName" doc:id="34b82252-02a7-410a-9200-fe8a0f61a330" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Detail CSV file to Message Store" doc:id="e49d2231-a6a1-4708-81d6-d032377982e6" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8a8be541-8434-4034-9bdc-5089a9f4df7e" message="#['\n\t stored CSV into message store']"/>
+		<file:write doc:name="Write Detail CSV to MMS Adapter Outbound Folder" doc:id="668a8df1-5a33-4c52-b671-329e0d5258fc" config-ref="MMS_Out_config" path="#[vars.Out_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="2b2d97f1-0ec2-4d65-ae53-c659146394e6" message="#['\n\t Written CSV into MMS Outbound Folder']"/>
+		<file:write doc:name="Write trigger file for Detail" doc:id="4998b411-5497-41ae-b679-d91a0602a1c0" config-ref="MMS_Out_config" path="#[vars.Trg_FileName]"/>
+		<set-payload value="#[%dw 2.0 
+output application/csv
+---
+vars.Result.Header]" doc:name="Set Payload to Header" doc:id="65c6c4da-2eec-4214-b056-5fba4afb06d5" />
+		<set-variable value="#[%dw 2.0 
+output application/json
+---
+p('InboundMMSWorkFile.ShipLoad_Header') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.csv']" doc:name="Out_FileName" doc:id="d7240040-f1fa-4e09-ba2f-2863b21a4ff9" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0 
+output application/json
+---
+p('InboundMMSWorkFile.ShipLoad_Header') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.trg']" doc:name="Trg_FileName" doc:id="16d1a834-246b-49a2-a865-5148b72a2447" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Header CSV to Message Store" doc:id="34db5ed9-d5e7-4f84-a5c8-180a625a0318" name="MessageStore-Store-ToMMS-Flow"/>
+		<file:write doc:name="Write Header CSV to MMS Adapter Outbound Folder" doc:id="522f6aa4-f0aa-45e8-ab47-1d8c65e79ebb" config-ref="MMS_Out_config" path="#[vars.Out_FileName]"/>
+		<file:write doc:name="Write trigger file for Header" doc:id="163088e0-dd25-4dd7-a71d-210cdf4de1e2" config-ref="MMS_Out_config" path="#[vars.Trg_FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="62990494-868c-4ee2-8d34-2a0cc54fa200" message="#[vars.Result.Header.WMITRN as String default ' ' ++ 'processed']"/>
+	</sub-flow>
+</mule>

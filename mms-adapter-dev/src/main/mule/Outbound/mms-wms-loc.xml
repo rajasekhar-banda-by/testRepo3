@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<flow name="Outbound_Loc_Control" doc:id="55cc1021-dbf1-45a7-9d44-5bf3c7ef7165" >
+		<logger level="INFO" doc:name="Logger" doc:id="8cb5c872-da7a-484f-8ae4-7692d6847466" message="#['\n\t Started processing for Location']"/>
+		<flow-ref doc:name="getCrossRef_CUST_INB" doc:id="5f227f77-5281-4760-94ec-050f6415c3e8" name="getCrossRef_CUST_INB"/>
+		<flow-ref doc:name="getCrossRef_SUPP_INB" doc:id="26c45baf-620a-4783-9059-424471cedac8" name="getCrossRef_SUPP_INB"/>
+		<flow-ref doc:name="Outbound_Loc_Process" doc:id="92d273bc-0d2b-481a-b1df-1e6248cafedb" name="Outbound_Loc_Process"/>
+	</flow>
+	<sub-flow name="Outbound_Loc_Process" doc:id="68049596-b907-4f3e-88ba-4873a8a14729" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="71e7237c-6277-4a07-be12-1ada06247b8b" variableName="Action"/>
+		<file:read doc:name="Read CSV" doc:id="0c9feade-9122-4222-9b1a-335b6e30b800" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="c4594770-7565-4cf6-8233-bcdba0b739f5" message="#['\n\t Input CSV Read']"/>
+		<flow-ref doc:name="Store CSV to message store " doc:id="e4db52ec-2611-49e9-81b8-843e55bdbe5b" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8b141d4d-4d65-4f6d-85ec-9323c9a21185" message="#['\n\t Input CSV stored into message store']"/>
+		<set-payload value="#[%dw 2.0
+output application/json
+---
+(payload orderBy $.STRNUM groupBy $.STRNUM) pluck $]" doc:name="Set Payload" doc:id="fa94b00a-e845-4403-97d3-fd1af7c05c20" />
+		<foreach doc:name="For Each" doc:id="8c4f8c9e-4b28-46b1-a804-2c074706d9f6">
+			<async doc:name="Async" doc:id="0682b883-eb74-4ae1-a26a-22f834ac295f">
+			<flow-ref doc:name="Outbound_Loc_CustXML" doc:id="0196c551-5a99-4664-b751-21f619ed7a2d" name="Outbound_Loc_CustXML" />
+		</async>
+			<async doc:name="Async" doc:id="d8e8ef46-1cda-493d-853c-0c1d77bc697d">
+			<flow-ref doc:name="Outbound_Loc_SuppXML" doc:id="41498554-34a0-470f-8901-3300d10b0f65" name="Outbound_Loc_SuppXML" />
+		</async>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="Outbound_Loc_CustXML" doc:id="a2b0aa57-4e7d-4500-8078-6d575dd01fd4" >
+		<set-variable value="#[payload]" doc:name="TBLSTR_LocData" doc:id="99674588-2f38-4dda-b320-e9b6a7244e58" variableName="TBLSTR_LocData" />
+		<ee:transform doc:name="Transform Message" doc:id="c1307ff3-d724-493f-962f-c230288a492f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var Wharehouse = vars.CUST_INB_CrossRefValues.WHSE_ID[0] pluck $
+---
+Wharehouse]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="36d76090-d44d-44be-9046-3ff46ee1a79a" >
+			<set-variable value="#[payload]" doc:name="WMS_Instance" doc:id="33c894eb-4c57-4c14-9038-6754f1577c37" variableName="WMS_Instance" />
+			<ee:transform doc:name="Transform Message" doc:id="2d8e2b9c-c3a5-4d11-9fd0-695ec8d168a8">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml skipNullOn = 'everywhere'
+
+var DftIFD 		= vars.CUST_INB_CrossRefValues
+var LocDta		= vars.TBLSTR_LocData
+var Warehouse	= vars.CUST_INB_CrossRefValues.WHSE_ID
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var WhsPrex 	= DftIFD."HOSTMAP"."DCTODCPRE" default ''
+var client		= DftIFD."HOSTMAP"."CLIENTID"[0] default ''
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getWhs(Store) = WhsPrex[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+---
+{
+	CUST_INB_IFD: {
+		(LocDta map (LocVal, Index) -> {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CNTRL_SEG"."TRANNAM"[0],
+			TRNVER: DftIFD."CNTRL_SEG"."TRANVER"[0],
+//			WHSE_ID: Warehouse[0][0],
+			WHSE_ID :vars.WMS_Instance,
+			ADDR_SEG: {
+				SEGNAM :DftIFD."ADDR_SEG"."SEGNAM"[0],
+				TRNTYP :if(vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+				CLIENT_ID : client,
+				HOST_EXT_ID :if (LocVal.STRHDO == 'S')
+								getStr(LocVal.STRNUM as String)
+							else if(LocVal.STRHDO == 'W')
+								getWhs(LocVal.STRNUM as String)
+							else null,
+				ADRNAM :if (LocVal.STRHDO == 'S')
+								getStr(LocVal.STRNUM as String)
+							else if(LocVal.STRHDO == 'W')
+								getWhs(LocVal.STRNUM as String)
+							else null,
+
+//				ADRNAM :LocVal.STRNAM,
+				ADRTYP :DftIFD."ADDR_SEG"."ADRTYP"[0],
+				ADRLN1 :LocVal.STADD1,
+				ADRLN2 :LocVal.STADD2,
+				ADRLN3 :LocVal.STADD3,
+				ADRCTY :LocVal.STCITY,
+//				ADRSTC :LocVal.STPVST,
+				ADRSTC :LocVal.STCNTY,
+				ADRPSZ :LocVal.STZIP default 0 as String,
+//				CTRY_NAME :DftIFD."ADDR_SEG"."CTRY_NAME"[0],
+				CTRY_NAME :LocVal.STCTRY,
+				RGNCOD :DftIFD."ADDR_SEG"."RGNCOD"[0],
+				PHNNUM :LocVal.STPHON default 0 as String,
+//				FAXNUM :DftIFD."ADDR_SEG"."FAXNUM"[0],
+				FAXNUM :LocVal.STFAXN default 0 as String,
+				RSAFLG :DftIFD."ADDR_SEG"."RSAFLG"[0],
+				TEMP_FLG :DftIFD."ADDR_SEG"."TEMP_FLG"[0],
+				LAST_NAME :LocVal.STRNAM default 0 as String,
+				FIRST_NAME :LocVal.STRNAM default 0 as String,
+				HONORIFIC :DftIFD."ADDR_SEG"."HONORIFIC"[0],
+				ADR_DISTRICT :DftIFD."ADDR_SEG"."ADR_DISTRICT"[0],
+				WEB_ADR :DftIFD."ADDR_SEG"."WEB_ADR"[0],
+//				EMAIL_ADR :DftIFD."ADDR_SEG"."EMAIL_ADR"[0],
+// Get email address from the file TBLXST.XSTEML
+				EMAIL_ADR :LocVal.XSTEML default '' as String,
+				PAGNUM :DftIFD."ADDR_SEG"."PAGNUM"[0],
+				LOCALE_ID :DftIFD."ADDR_SEG"."LOCALE_ID"[0],
+				ATTN_NAME :DftIFD."ADDR_SEG"."ATTN_NAME"[0],
+				ATTN_TEL :DftIFD."ADDR_SEG"."ATTN_TEL"[0],
+				CONT_NAME :DftIFD."ADDR_SEG"."CONT_NAME"[0],
+				CONT_TEL :DftIFD."ADDR_SEG"."CONT_TEL"[0],
+				CONT_TITLE :DftIFD."ADDR_SEG"."CONT_TITLE"[0],
+				PO_BOX_FLG :DftIFD."ADDR_SEG"."PO_BOX_FLG"[0]
+			},
+			CUST_SEG: {
+				SEGNAM :DftIFD."CUST_SEG"."SEGNAM"[0],
+				TRNTYP :if(vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+				CSTNUM : 
+						if (LocVal.STRHDO == 'S')
+							getStr(LocVal.STRNUM as String)
+						else if(LocVal.STRHDO == 'W')
+							getWhs(LocVal.STRNUM as String)
+						else null,
+				CLIENT_ID :client,
+				BCKFLG :DftIFD."CUST_SEG"."BCKFLG"[0],
+				PARFLG :DftIFD."CUST_SEG"."PARFLG"[0],
+				CARFLG :DftIFD."CUST_SEG"."CARFLG"[0],
+				SPLFLG :DftIFD."CUST_SEG"."SPLFLG"[0],
+				STDFLG :DftIFD."CUST_SEG"."STDFLG"[0],
+				SHPLBL :DftIFD."CUST_SEG"."SHPLBL"[0],
+				SHIPBY :DftIFD."CUST_SEG"."SHIPBY"[0],
+				WAYBBY :DftIFD."CUST_SEG"."WAYBBY"[0],
+				CARGRP :DftIFD."CUST_SEG"."CARGRP"[0],
+				MANFID :LocVal.STCOMP,
+				DEPTNO :DftIFD."CUST_SEG"."DEPTNO"[0],
+				LOCALE_ID :DftIFD."CUST_SEG"."LOCALE_ID"[0],
+				ORDINV :DftIFD."CUST_SEG"."ORDINV"[0],
+				CSTTYP : if (LocVal.SACCOD != null) 'STS' else 'STO',
+//					if (LocVal.STRHDO == 'S')
+////						DftIFD."CUST_SEG"."CSTTYP"."CSTTYP"."STORE"[0] 
+//						LocVal.STCOMP
+//					else if(LocVal.STRHDO == 'W')
+//						DftIFD."CUST_SEG"."CSTTYP"."CSTTYP"."WAREHOUSE"[0]
+//					else null,
+				INVSTS_PRG :DftIFD."CUST_SEG"."INVSTS_PRG"[0],
+				FRSCOD :DftIFD."CUST_SEG"."FRSCOD"[0],
+				MIN_SHELF_HRS :DftIFD."CUST_SEG"."MIN_SHELF_HRS"[0],
+				RSVPRI :DftIFD."CUST_SEG"."RSVPRI"[0],
+				REQUIR_TMS_COD :DftIFD."CUST_SEG"."REQUIR_TMS_COD"[0],
+				PLTBLD_CONSBY :DftIFD."CUST_SEG"."PLTBLD_CONSBY"[0],
+				LOD_TAG_SNGLE_ENCODE :DftIFD."CUST_SEG"."LOD_TAG_SNGLE_ENCODE"[0],
+				LOD_TAG_MIX_ENCODE :DftIFD."CUST_SEG"."LOD_TAG_MIX_ENCODE"[0],
+				SUB_TAG_SNGLE_ENCODE :DftIFD."CUST_SEG"."SUB_TAG_SNGLE_ENCODE"[0],
+				SUB_TAG_MIX_ENCODE :DftIFD."CUST_SEG"."SUB_TAG_MIX_ENCODE"[0],
+				URN_FORMAT :DftIFD."CUST_SEG"."URN_FORMAT"[0],
+				ALC_SEARCH_PATH :DftIFD."CUST_SEG"."ALC_SEARCH_PATH"[0],
+				ABS_ORDINV_WIN :DftIFD."CUST_SEG"."ABS_ORDINV_WIN"[0],
+				ABS_ORDINV_CODE :DftIFD."CUST_SEG"."ABS_ORDINV_CODE"[0],
+				LOAD_ATTR1_CFG :DftIFD."CUST_SEG"."LOAD_ATTR1_CFG"[0],
+				LOAD_ATTR2_CFG :DftIFD."CUST_SEG"."LOAD_ATTR2_CFG"[0],
+				LOAD_ATTR3_CFG :DftIFD."CUST_SEG"."LOAD_ATTR3_CFG"[0],
+				LOAD_ATTR4_CFG :DftIFD."CUST_SEG"."LOAD_ATTR4_CFG"[0],
+				LOAD_ATTR5_CFG :DftIFD."CUST_SEG"."LOAD_ATTR5_CFG"[0]
+				}
+			}					
+		})	
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++ &quot;_Cust_Loc_&quot;++ vars.TBLSTR_LocData[0].STRNUM as String ++ &quot;_&quot; ++ vars.Global.curDateTime default ''++&quot;.xml&quot;]" doc:name="Out_FileName" doc:id="7c4c2335-cb0e-464d-8c26-903e643e1f9e" variableName="Out_FileName" />
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="5dd19ef1-0d45-43c0-ba13-3864dc8cdb18" variableName="Action"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="d1127c5a-d962-476a-ac77-39739c93e97d" name="MessageStore-Store-FromMMS-Flow"/>
+			<logger level="INFO" doc:name="Logger" doc:id="439a2ed1-5a03-4fee-9aaa-ef05c6ec4a3f" message="#['\n\t Stored Customer XML file to Message Store']"/>
+			<flow-ref doc:name="Send To Destinations" doc:id="11bc599f-09c3-4c91-98a9-9446dac5dfdb" name="Outbound_Send_To_Destinations"/>
+			<logger level="INFO" doc:name="Logger" doc:id="fe54590f-e549-4845-a990-e01a50c393ae" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="Outbound_Loc_SuppXML" doc:id="2998734b-d34b-49cf-b309-af37955e9099" >
+		<set-variable value="#[payload]" doc:name="TBLSTR_LocData" doc:id="73c16c54-0e42-4a1c-83d0-0593f420887b" variableName="TBLSTR_LocData"/>
+		<ee:transform doc:name="Transform Message" doc:id="409f95ba-4be4-4c1d-8f88-97f76b03bfb9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var Wharehouse = vars.SUPP_INB_CrossRefValues.WHSE_ID[0] pluck $
+---
+Wharehouse]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="e7302c4b-79e8-45bd-9cd0-f7d3cbf5f621" >
+			<set-variable value="#[payload]" doc:name="WMS_Instance" doc:id="b859454f-4153-4cb3-bab9-50d72e87aa51" variableName="WMS_Instance"/>
+			<ee:transform doc:name="Transform Message" doc:id="8b598517-24f6-4fe3-a878-659a5e2b2c24" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml skipNullOn = 'everywhere'
+
+var DftIFD 		= vars.SUPP_INB_CrossRefValues
+var LocDta		= vars.TBLSTR_LocData
+var Warehouse	= vars.SUPP_INB_CrossRefValues.WHSE_ID
+var client		= DftIFD."HOSTMAP"."CLIENTID"[0] default ''
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var WhsPref 	= DftIFD."HOSTMAP"."DCTODCPRE" default ''
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getWhs(Store) = WhsPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+---
+{
+	SUPP_INB_IFD:{
+	(LocDta map (LocVal, Index) -> {
+	CTRL_SEG: {
+		TRNNAM :DftIFD."CNTRL_SEG"."TRANNAM"[0] default '',
+		TRNVER :DftIFD."CNTRL_SEG"."TRANVER"[0],
+//		WHSE_ID :Warehouse[0][0],	
+		WHSE_ID :vars.WMS_Instance,	
+		SUPP_SEG: {
+			SEGNAM :DftIFD."SUPP_SEG"."SEGNAM"[0],
+			TRNTYP :if(vars.initialLoad == 'Yes') 'A' else (if (LocVal.PCGCDE == 'U') 'C' else LocVal.PCGCDE),
+			SUPNUM :
+					if (LocVal.STRHDO == 'S')
+						getStr(LocVal.STRNUM as String)
+					else if(LocVal.STRHDO == 'W')
+						getWhs(LocVal.STRNUM as String)
+					else null,
+			CLIENT_ID :client,
+			HOST_EXT_ID :if (LocVal.STRHDO == 'S')
+							getStr(LocVal.STRNUM as String)
+						else if(LocVal.STRHDO == 'W')
+							getWhs(LocVal.STRNUM as String)
+						else null,
+			ADRNAM :LocVal.STRNAM,
+			ADRTYP :DftIFD."SUPP_SEG"."ADRTYP"[0],
+			ADRLN1 :LocVal.STADD1,
+			ADRLN2 :LocVal.STADD2,
+			ADRLN3 :LocVal.STADD3,
+			ADRCTY :LocVal.STCITY,
+//			ADRSTC :LocVal.STPVST,
+			ADRSTC :LocVal.STCNTY,
+			ADRPSZ :LocVal.STZIP default 0 as String,
+//			CTRY_NAME :DftIFD."SUPP_SEG"."CTRY_NAME"[0],
+			CTRY_NAME :DftIFD."SUPP_SEG"."CTRY_NAME"[0],
+			RGNCOD :DftIFD."SUPP_SEG"."RGNCOD"[0],
+			PHNNUM :LocVal.STPHON default 0 as String,
+//			FAXNUM :DftIFD."SUPP_SEG"."FAXNUM"[0],
+			FAXNUM :LocVal.FAXNUM default 0 as String,
+			RSAFLG :DftIFD."SUPP_SEG"."RSAFLG"[0],
+			TEMP_FLG :DftIFD."SUPP_SEG"."TEMP_FLG"[0],
+			LAST_NAME :DftIFD."SUPP_SEG"."LAST_NAME"[0],
+			FIRST_NAME :DftIFD."SUPP_SEG"."FIRST_NAME"[0],
+			HONORIFIC :DftIFD."SUPP_SEG"."HONORIFIC"[0],
+			ADR_DISTRICT :DftIFD."SUPP_SEG"."ADR_DISTRICT"[0],
+			WEB_ADR :DftIFD."SUPP_SEG"."WEB_ADR"[0],
+//			EMAIL_ADR :DftIFD."SUPP_SEG"."EMAIL_ADR"[0],
+// Get email address from TBLXST.XSTEML
+			EMAIL_ADR :LocVal.XSTEML,			
+			PAGNUM :DftIFD."SUPP_SEG"."PAGNUM"[0],
+			LOCALE_ID :DftIFD."SUPP_SEG"."LOCALE_ID"[0],
+			PO_BOX_FLG :DftIFD."SUPP_SEG"."PO_BOX_FLG"[0],
+			TRK_CNSG_COD :DftIFD."SUPP_SEG"."TRK_CNSG_COD"[0],
+			ASSET_TYP :DftIFD."SUPP_SEG"."ASSET_TYP"[0],
+			RCVSTS :DftIFD."SUPP_SEG"."RCVSTS"[0],
+			LOT_FMT_ID :DftIFD."SUPP_SEG"."LOT_FMT_ID"[0],
+			SER_NUM_TYP_ID :DftIFD."SUPP_SEG"."SER_NUM_TYP_ID"[0],
+			TRUST_FLG :	if (LocVal.STRHDO == 'S') DftIFD."SUPP_SEG"."TRUST_FLG_Store"[0] 
+						else if (LocVal.STRHDO == 'W') DftIFD."SUPP_SEG"."TRUST_FLG_Whs"[0] 
+						else null,
+			LOAD_ATTR1_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR1_CFG"[0],
+			LOAD_ATTR2_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR2_CFG"[0],
+			LOAD_ATTR3_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR3_CFG"[0],
+			LOAD_ATTR4_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR4_CFG"[0],
+			LOAD_ATTR5_CFG :DftIFD."SUPP_SEG"."LOAD_ATTR5_CFG"[0]
+			}				
+		}
+	})
+	}
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++&quot;_Supp_Loc_&quot;++ vars.TBLSTR_LocData[0].STRNUM as String ++ &quot;_&quot; ++ vars.Global.curDateTime default ''++&quot;.xml&quot;]" doc:name="Out_FileName" doc:id="26770f51-2c27-408a-9a63-91ce62edca89" variableName="Out_FileName"/>
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="5a923630-73a5-48a3-a8ef-2403bf4fc884" variableName="Action"/>
+			<flow-ref doc:name="Store XML to Message Store" doc:id="5c517f40-902e-469f-a6d4-184634dcbc70" name="MessageStore-Store-FromMMS-Flow"/>
+			<logger level="INFO" doc:name="Logger" doc:id="a4b01e00-a08e-40ce-a3bf-1522429320e6" message="#['\n\t Stored Supplier XML file to Message Store']"/>
+			<flow-ref doc:name="Send To Destinations" doc:id="6c2674c2-9ffd-41d9-bfd0-524c4a9793be" name="Outbound_Send_To_Destinations"/>
+			<logger level="INFO" doc:name="Logger" doc:id="0f8318af-940f-44bc-b545-644447b79cdc" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+		</foreach>
+	</sub-flow>
+</mule>

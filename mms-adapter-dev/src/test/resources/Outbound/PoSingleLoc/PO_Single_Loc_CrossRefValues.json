@@ -1,0 +1,34 @@
+[
+  {
+    "WHSE_ID": {
+      "555": "CHAPTER1"
+    }
+  },
+  {
+    "HOSTMAP": {
+      "STRPRE": "S",
+      "STRZNPRE": "Z",
+      "VENDORPRE": "V",
+      "DCTODCPRE": "W",
+      "CLIENT_ID": "----"
+    }
+  },
+  {
+    "CTRL_SEG": {
+      "TRNNAM": "RA_TRAN",
+      "TRNVER": "8.3"
+    }
+  },
+  {
+    "HEADER_SEG": {
+      "SEGNAM": "HEADER_SEG"
+    }
+  },
+  {
+    "LINE_SEG": {
+      "SEGNAM": "LINE_SEG",
+      "INVSLN": "0",
+      "RCVSTS": "DISP"
+    }
+  }
+]

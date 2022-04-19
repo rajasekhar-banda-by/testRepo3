@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="mms-wms-poasn-cross-dock-test-suite.xml" />
+	<munit:test name="mms-wms-poasn-cross-dock-test-suite-Outbound_POAsn_ControlTest" doc:id="5317b514-7cc7-4e25-86e4-0f697edaed1c" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="getCrossRef_RCPT_CROSS_DOCK" doc:id="f0c404d9-aba6-411e-a0d3-5ffee12da965" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="getCrossRef_RCPT_CROSS_DOCK" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="Global" value='#[readUrl("classpath://Outbound/Global.json", "application/json")]' />
+						<munit-tools:variable key="PO_ASN_CrossDock_CrossRefValues" value='#[readUrl("classpath://Outbound/PoAsn/PO_ASN_CrossDock_CrossRefValues.json", "application/json")]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Read CSV" doc:id="3accb4fe-f3be-4af5-819f-ca28b65afddb" processor="file:read">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Read CSV" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="d50bc075-b013-43b2-9433-e02e751c37f9" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0 output application/csv --- readUrl("classpath://Outbound/PoAsn/POASN_OUB_WMS_QUA_WST_20210104183113571436.csv", "application/csv")]' mediaType="application/csv" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="MessageStore-Store-FromMMS-Flow" doc:id="73d2e370-683c-4dab-8893-217953a10a85" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="MessageStore-Store-FromMMS-Flow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Send to Destinations" doc:id="f2fd9746-ffdd-4573-921e-f49d96951f33" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Outbound_Send_To_Destinations" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref to Outbound_POAsn_Control" doc:id="cf41535d-f64e-4df0-a9d9-8744b9c8388d" name="Outbound_POAsn_Control"/>
+		</munit:execution>
+	</munit:test>
+
+
+</mule>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:message-store="http://www.mulesoft.org/schema/mule/message-store"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/message-store http://www.mulesoft.org/schema/mule/message-store/current/mule-message-store.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<flow name="Inbound_InvRcpt_Flow" doc:id="13582dbb-82df-4125-92bb-7d2a77577f31" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="8ee8f84c-83f5-458a-ac4e-c6bc3a84e210" variableName="Action"/>
+		<flow-ref doc:name="Store XML data to Message Store" doc:id="eafc0ff6-8be9-48d5-ac2b-7b02ed4dc761" name="MessageStore-Store-ToMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="0c44d3e6-0109-4b88-a805-dc0465a4b6a5" message="#['\n\t stored XML into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="174eb65a-0907-44fd-95d6-2a5dcb2d7bf7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+
+import isNumeric from dw::core::Strings
+fun getSup(vendor) = vendor[1 to (sizeOf(vendor)) -1 ]
+fun getSize(vendor1) = sizeOf(vendor1)
+
+//var xmlDta = payload
+
+---
+
+{
+Header:
+       (payload...*INVENTORY_RECEIPT_IFD_SEG map ( val , idx) -> {
+//       (xmlDta...*INVENTORY_RECEIPT_IFD_SEG map ( val , idx) -> {
+        
+					       WMITRN: val.TRNNUM as Number,
+                           WMICST: '',
+//                           WMIPST: if ((val.INVTYP == 'W01' or val.INVTYP == 'W02' or val.INVTYP == 'W03' or val.INVTYP == 'W04' or val.INVTYP == 'W05') and (val.INVNUM != null and isNumeric(val.INVNUM))) '2' else '',
+                           WMIPST: '',
+                           WMITRK: val.TRKNUM default '',
+//	                       WMIINV: val.INVNUM,
+                           WMIINV: '',
+                           WMIITP: val.INVTYP default '',
+                           WMICID: val.CLIENT_ID default '',
+//                           WMICLK: 'WMS',
+                           WMISUP: getSup(val.SUPNUM default ' ') as Number,
+//                         WMIRCV: val.POMRCV,
+                           WMIRCV: if ((val.INVTYP == 'W01' or val.INVTYP == 'W02' or val.INVTYP == 'W03' or val.INVTYP == 'W04' or val.INVTYP == 'W05') and (val.INVNUM != null and isNumeric(val.INVNUM))) val.INVNUM as Number else 0,
+//                           WMIRCV: 0,
+//                         WMIPON: if (val.INVTYP == 'NAC' or val.INVTYP == 'IMP' or val.INVTYP == 'IMPC' or val.INVTYP == 'DEVS') val.PONUM[0 to 5] as Number else 0,
+//                         WMIPON: if (val.INVTYP == 'NAC' or val.INVTYP == 'IMP' or val.INVTYP == 'IMPC') val.INVNUM as Number else 0,
+						   WMIPON: if (val.INVTYP != 'W99') val.PONUM as Number else 0,
+//						   WMIPLN: val.POLIN,
+                           WMIBON : 0,
+                           WMITRF : if (val.INVTYP == 'ZACC' or val.INVTYP == 'ZSTR' or val.INVTYP == 'ZPBS' or val.INVTYP == 'ZIFSRMM' or val.INVTYP == 'ZIFSRMS'
+                           				or val.INVTYP == 'ZIFSBBS' or val.INVTYP == 'ZIFSBBM' or val.INVTYP == 'ZCOSSOS' or val.INVTYP == 'ZCOSSOM' or val.INVTYP == 'ZDIR'
+                           				or val.INVTYP == 'ZDCO' or val.INVTYP == 'ZDAC') val.INVNUM else if (val.INVTYP == 'W99') val.PONUM else '',
+                           WMICDT : (val.TRNDTE)[2 to 7] as Number,
+//                           WMITDT: (val.TRNDTE)[8 to 13] as Number,
+                           WMIWID: if (val.WH_ID == 'CHAPTER1') '555' as Number else 0,
+                           WMIBOL: val.WAYBILL,
+                           WMIMUID: uuid(),
+                           WMICRD : now() as String {format: 'yyyyMMdd'},
+                           WMICRT : now() as String {format: 'hhmmss'},
+                           WMIPGM : '',
+                           WMIMDT : '',
+                           WMIMTM : '',
+                           WMIERR: '',
+                           WMIEML: ''
+                           }),
+              
+//                      Detail:(xmlDta...*INVENTORY_RECEIPT_IFD_SEG map ( val , idx) -> {
+                     Detail:(payload...*INVENTORY_RECEIPT_IFD_SEG map ( val , idx) -> {
+
+						   WMITRN: val.TRNNUM as Number, 
+                           WMITRK: val.TRKNUM default '',
+//                         WMIINV: val.INVNUM,
+						   WMIINV: '',
+                           WMIITP: val.INVTYP default '',
+                           WMISUP: getSup(val.SUPNUM default ' ') as Number,
+                           WMIPON: if (val.INVTYP != 'W99') val.PONUM as Number else 0,
+                           WMIBON : 0,
+                           WMIRCV: if ((val.INVTYP == 'W01' or val.INVTYP == 'W02' or val.INVTYP == 'W03' or val.INVTYP == 'W04' or val.INVTYP == 'W05') and (val.INVNUM != null and isNumeric(val.INVNUM))) val.INVNUM as Number else 0,
+//                           WMIRCV: 0,
+//                         WMIPON: if (val.INVTYP == 'NAC' or val.INVTYP == 'IMP' or val.INVTYP == 'IMPC' or val.INVTYP == 'DEVS') val.PONUM[0 to 5] as Number else 0,
+ 
+//                         WMITRF : if (val.INVTYP == 'REB' or val.INVTYP == 'TRFCD' or val.INVTYP == 'RTV') val.PONUM else'' ,
+                           WMITRF : if (val.INVTYP == 'ZACC' or val.INVTYP == 'ZSTR' or val.INVTYP == 'ZPBS' or val.INVTYP == 'ZIFSRMM' or val.INVTYP == 'ZIFSRMS'
+                           				or val.INVTYP == 'ZIFSBBS' or val.INVTYP == 'ZIFSBBM' or val.INVTYP == 'ZCOSSOS' or val.INVTYP == 'ZCOSSOM' or val.INVTYP == 'ZDIR'
+                           				or val.INVTYP == 'ZDCO' or val.INVTYP == 'ZDAC') val.INVNUM else if (val.INVTYP == 'W99') val.PONUM else '',
+
+                           WMILIN: val.INVLIN default 0,
+                           WMIVPN : val.PRTNUM as String default '',
+                           WMIQTY : val.RCVQTY as Number,
+                           WMISTS: val.RCVSTS default "",
+                           WMISLT: '',
+                           WMICAR : val.LODNUM default '',
+                           WMIPGM: '',
+                           WMIMDT: '',
+                           WMIMTM: '',
+                           WMIERR: ''
+                           }
+              )
+              
+              }
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="08a21fbb-03ad-496d-90fb-290a4d02e283" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Result" ><![CDATA[%dw 2.0
+output application/json
+
+var Head = (payload.Header orderBy $.WMIPON groupBy $.WMIPON) pluck $
+var Det = payload.Detail
+
+---
+{
+WMSMRH: (Head map (Hdr,Hdrindex) ->{
+WMITRN : Hdr[0].WMITRN,
+WMICST : Hdr[0].WMICST,
+WMIPST : Hdr[0].WMIPST,
+WMITRK : Hdr[0].WMITRK,
+WMIINV : Hdr[0].WMIINV,
+WMIITP : Hdr[0].WMIITP,
+WMICID : Hdr[0].WMICID,
+//WMICLK : Hdr[0].WMICLK,
+WMISUP : Hdr[0].WMISUP,
+WMIRCV : Hdr[0].WMIRCV,
+WMIPON : Hdr[0].WMIPON,
+WMIBON : Hdr[0].WMIBON,
+WMITRF : Hdr[0].WMITRF,
+WMICDT : Hdr[0].WMICDT,
+//WMITDT : Hdr[0].WMITDT,
+WMIWID : Hdr[0].WMIWID,
+WMIBOL : Hdr[0].WMIBOL,
+WMIMUID : Hdr[0].WMIMUID,
+WMICRD : Hdr[0].WMICRD,
+WMICRT : Hdr[0].WMICRT,
+WMIPGM : Hdr[0].WMIPGM,
+WMIMDT : Hdr[0].WMIMDT,
+WMIMTM : Hdr[0].WMIMTM,
+WMIERR : Hdr[0].WMIERR,
+WMIEML : Hdr[0].WMIEML
+              }),
+WMSMRD: Det
+
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#['Sent']" doc:name="Action" doc:id="554ddd46-90cf-4ef3-b8d1-77bac3aecad0" variableName="Action"/>
+		<set-payload value="#[%dw 2.0 
+output application/csv
+---
+vars.Result.WMSMRD]" doc:name="Set Payload to Detail" doc:id="5651849d-b806-4a64-8d10-a1e19b5dd2ec" />
+		<set-variable value="#[%dw 2.0 output application/json 
+---
+p('InboundMMSWorkFile.InvRcpt_Detail') ++ '_' 
+++ vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.csv']" doc:name="Out_FileName" doc:id="7013eeab-6750-462c-88b5-e1092372c614" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0 output application/json 
+---
+p('InboundMMSWorkFile.InvRcpt_Detail') ++ '_' ++ vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Detail.trg']" doc:name="Trg_FileName" doc:id="84bd9d57-8d03-4a7e-882a-ec998844576d" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Detail CSV to Message Store" doc:id="52b1b5d1-7eee-4b19-a950-4341d7510605" name="MessageStore-Store-ToMMS-Flow" />
+		<logger level="INFO" doc:name="Logger" doc:id="a9a49867-cce7-4ac2-af28-25548cef9bb5" message="#['\n\t stored CSV into message store']"/>
+		<file:write doc:name="Write Detail CSV" doc:id="edcdc6a2-aa50-4d25-ba6c-b98549597a31" config-ref="MMS_Out_config" path="#[vars.Out_FileName]">
+		</file:write>
+		<logger level="INFO" doc:name="Logger" doc:id="55e3a19c-b94f-4933-934f-6c646486ee2f" message="#['\n\t Written CSV into MMS Outbound Folder']"/>
+		<file:write doc:name="Write Detail TRG" doc:id="5044cb22-c484-4992-bc42-b16f364ffd93" path="#[vars.Trg_FileName]" config-ref="MMS_Out_config">
+			<file:content ><![CDATA[#['']]]></file:content>
+		</file:write>
+		<set-payload value="#[%dw 2.0 
+output application/csv
+---
+vars.Result.WMSMRH]" doc:name="Set Payload to Header" doc:id="da56c3e2-fbcd-4598-94bc-9ce94b761a49" />
+		<set-variable value="#[%dw 2.0 output application/json 
+---
+p('InboundMMSWorkFile.InvRcpt_Header') ++ '_' ++ 
+vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.csv']" doc:name="Out_FileName" doc:id="43147983-99a9-48f6-ac62-ce0e81dd4b48" variableName="Out_FileName"/>
+		<set-variable value="#[%dw 2.0 output application/json 
+---
+p('InboundMMSWorkFile.InvRcpt_Header') ++ '_' ++ vars.Global.FileName[0 to sizeOf(vars.Global.FileName) - 5] ++ '_Header.trg']" doc:name="Trg_FileName" doc:id="ec409b5b-5ace-4e04-9d21-6e070f8eedb9" variableName="Trg_FileName"/>
+		<flow-ref doc:name="Store Header CSV to Message Store" doc:id="f0734e20-cf75-4d1a-99e0-9928b71ea31a" name="MessageStore-Store-ToMMS-Flow"/>
+		<file:write doc:name="Write Header CSV" doc:id="5c58ca28-670d-4cd5-8f34-3109b6198ca3" config-ref="MMS_Out_config" path="#[vars.Out_FileName]">
+		</file:write>
+		<file:write doc:name="Write Header TRG" doc:id="e8bf9202-25a0-4a35-a201-8b5a006a008a" path="#[vars.Trg_FileName]" config-ref="MMS_Out_config">
+			<file:content ><![CDATA[#['']]]></file:content>
+		</file:write>
+		<logger level="INFO" doc:name="Logger" doc:id="e9a7d8f5-b090-45bc-a3fa-9e658a0d480a" message="#['Inv Receipt Processed: ' ++ vars.Out_FileName as String]"/>
+	</flow>
+</mule>

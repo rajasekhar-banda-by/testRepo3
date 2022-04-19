@@ -1,0 +1,43 @@
+[
+  {
+    "WHSE_ID": {
+      "555": "CHAPTER1"
+    }
+  },
+  {
+    "HOSTMAP": {
+      "STRPRE": "S",
+      "STRZNPRE": "Z",
+      "VENDORPRE": "V",
+      "DCTODCPRE": "W",
+      "CLIENTID": "----"
+    }
+  },
+  {
+    "CNTRL_SEG": {
+      "TRANNAM": "CUST_TRAN",
+      "TRANVER": "2017.1"
+    }
+  },
+  {
+    "ADDR_SEG": {
+      "SEGNAM": "ADDR_SEG",
+      "ADRCTY": "Manila city 333",
+      "ADRSTC": "Manila CITY 123",
+      "ADRPSZ": "1300",
+      "CTRY_NAME": "PHL",
+      "LOCALE_ID": "US_ENGLISH"
+    }
+  },
+  {
+    "CUST_SEG": {
+      "SEGNAM": "CUSTOMER",
+      "CSTTYP": {
+        "CSTTYP": {
+          "STORE": "STOR",
+          "VENDOR": "RET"
+        }
+      }
+    }
+  }
+]

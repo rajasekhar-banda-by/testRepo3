@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+
+<file:config name="File_Config3" doc:name="File Config" doc:id="adfd2913-c54a-4a6d-bd15-720e975adeff" >
+		<file:connection workingDir="${MMS.InBoundDir}" />
+	</file:config>
+	<flow name="mms_OutBound_Listen_Sku_Queue" doc:id="5cb7ce9a-c9d0-441c-a9cf-6080626eff18" initialState="started">
+		<jms:listener doc:name="Listener" doc:id="8aab36e8-cd17-460f-905b-4b70dbda965a" destination="${Queue.Outbound.SKU}" config-ref="JMS_Config">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="3d6956c3-048e-404a-9190-8f3809d84e05" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_SkuFlow_Control" doc:id="f89678d9-4e7d-4f6e-ab1e-fded5779a3a8" name="Outbound_SkuFlow_Control" />
+		<file:delete doc:name="Delete processed csv FileName" doc:id="0f02aefc-04b8-4b91-bb4a-077863598655" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="27aea4fc-2a94-457c-abc6-d0ed84fac0b7" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	<flow name="mms_OutBound_Listen_Loc_Queue" doc:id="15802389-41f7-4496-a91a-a63dbb9f903e" >
+		<jms:listener doc:name="Listener" doc:id="61d0b8df-74e4-4d96-8ea7-698a1dd5d0d1" config-ref="JMS_Config" destination="${Queue.Outbound.LOC}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="65709329-ac33-4d17-bae7-2b11ccb10179" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_Loc_Control" doc:id="92d9be0e-2eec-4b93-a588-0b94467c1777" name="Outbound_Loc_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="f6d43a66-e5fd-4f2b-b184-fa3262de84c5" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="a88bb896-799c-4244-8909-3ea427f926e4" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	<flow name="mms_OutBound_Listen_Supp_Queue" doc:id="5e080f2b-f571-4c01-b2e1-27791a8152b0" >
+		<jms:listener doc:name="Listener" doc:id="51e839a3-79d7-4f38-88eb-4633ca564225" config-ref="JMS_Config" destination="${Queue.Outbound.SUPP}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="2e273520-9f30-4d18-ba57-fada823160e2" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_Sup_Control" doc:id="f5495228-f24f-463b-b1b1-c880825e0bbb" name="Outbound_Sup_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="b8c07b8a-af7b-4fc0-92d4-0f30bc25f6f2" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="aeb3af57-1d37-4a9f-bea5-a4594d406435" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	
+	<flow name="mms_OutBound_Listen_StrInb_Queue" doc:id="4da9e32e-7c1a-45f3-8f5d-be6a1c79a904" >
+		<jms:listener doc:name="Listener" doc:id="b7c3462c-4329-4d7e-ab1e-69c82d57822a" config-ref="JMS_Config" destination="${Queue.Outbound.STOREINB}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="3f58c7f4-aadd-493c-a109-0e82ee3173a1" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_StrInb_Control" doc:id="8b9c46ee-001c-4a20-aabd-c47d15d0a565" name="Outbound_StrInb_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="78b276d4-7a31-429a-99d9-6ae106a51dac" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="7d8afe62-5cc9-47b2-9505-3e86a6e691b4" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	
+	
+	<flow name="mms_OutBound_Listen_SingleLocPO_Queue" doc:id="953ee0b5-68fd-40d9-8af6-f59738360899" >
+		<jms:listener doc:name="Listener" doc:id="84536e01-b943-41c7-a602-0eab31439543" config-ref="JMS_Config" destination="${Queue.Outbound.POSINGLELOC}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="8fa32599-6cbd-4c69-aff7-33953d56b2cd" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_SingleLocPO_Control" doc:id="1cbd10da-062a-408e-8fc3-291b7735d45b" name="Outbound_SingleLocPO_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="4d13f3df-47a7-491a-9249-6f8fd0cf2e85" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="054d7cb9-d658-48a5-a101-b84582656c12" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	
+<flow name="mms_OutBound_Listen_TransferReceive_Queue" doc:id="da89dbb9-fd75-4875-8ae5-2b8893b64371" >
+		<jms:listener doc:name="Listener" doc:id="9e68dceb-9dc2-472a-9362-2ca21384c0f6" config-ref="JMS_Config" destination="${Queue.Outbound.TRFRCV}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="c320a71f-ac7d-4e21-b911-2badf06162c3" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_TransferReceive_Control" doc:id="9925459f-aa6e-4c9d-b698-41c3417a49ae" name="Outbound_TransferReceive_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="65af9cbb-e057-4646-a817-60eaacaa9329" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="151fbcf4-5ec6-4575-8824-d7c647d5f955" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	<flow name="mms_OutBound_Listen_Transfer_Queue" doc:id="df733bb1-f233-4ca2-b5b9-6dd27786dbd6" >
+		<jms:listener doc:name="Listener" doc:id="1297bb02-42d8-4ffa-bfcf-ca1fd23dd35e" config-ref="JMS_Config" destination="${Queue.Outbound.TRANSFER}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="0f7f3114-c74b-4e81-9dd3-d90bac2e573e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_Transfer_Control" doc:id="50ee109b-c00e-416b-bb5f-745ee23d80a5" name="Outbound_Transfer_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="1ef7989d-68ce-4678-b624-9e2b9afc82db" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="71042c0e-b443-42c9-9244-c78e7490fd4c" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+
+<flow name="mms_OutBound_Listen_POAsn_Queue" doc:id="db42b1ad-01f5-4284-85bf-02fc476f64d1" >
+		<jms:listener doc:name="Listener" doc:id="c6c90c9b-2b95-4278-b4e3-23e99c5f9a2f" config-ref="JMS_Config" destination="${Queue.Outbound.POASN}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="60d5a222-6990-4170-b27d-a1d726a0a523" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_POAsn_Control" doc:id="f51e70d8-2f49-4bea-88e5-dd5b3f2766d4" name="Outbound_POAsn_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="33b2f66b-9102-4aa2-863f-310399d59489" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="04e3acf8-6c04-439f-97ac-e36dbab5a7c3" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	<flow name="mms_OutBound_Listen_Rtv_Queue" doc:id="88f92fe4-04ce-4867-8ada-005399225c51" >
+		<jms:listener doc:name="Listener" doc:id="d226ba44-886b-42f8-8d33-eceb4f8fd137" config-ref="JMS_Config" destination="${Queue.Outbound.RTV}">
+			<jms:consumer-type >
+				<jms:queue-consumer />
+			</jms:consumer-type>
+		</jms:listener>
+		<ee:transform doc:name="Transform Message" doc:id="ca6b3111-5db3-4add-a9e5-93cc3f6b4745" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Global" ><![CDATA[%dw 2.0
+output application/json
+var csvFileName = payload
+var extractArray = csvFileName find '_'
+---
+{
+"FileName"				: csvFileName,
+"FlowName"				: csvFileName[0 to extractArray[0] -1],
+"MMSInstanceName"		: csvFileName[extractArray[2] + 1 to extractArray[3] -1],
+"ClientId"				: csvFileName[extractArray[3] + 1 to extractArray[4] -1],
+"InstanceIdentifier"	: uuid(),
+"curDateTime"			: now() as String {format: "yyyyMMddHHmmssSSS"},
+"ProcessTime"			: (now() as String {format:"yyyy-MM-dd'T'HH:mm:ss.SSSSSS"}) as String {format:"yyyy-MM-dd-HH:mm:ss.SSSSSS"}
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Outbound_Rtv_Control" doc:id="163ac46a-97b4-4c1a-be09-40eba8247c0c" name="Outbound_Rtv_Control"/>
+		<file:delete doc:name="Delete processed csv FileName" doc:id="dc47f056-1370-4a2f-9d4b-c1201a3bb7c8" config-ref="MMS_In_Config" path="#[vars.Global.FileName]" />
+		<logger level="INFO" doc:name="Logger" doc:id="2dace7c4-8ed7-4428-860d-262b83ca5500" message="#[' File Name ' ++ vars.Global.FileName ++ '  Has been deleted after processing ']" />
+	
+</flow>
+	<sub-flow name="Outbound_Send_To_Destinations" doc:id="8c9fa052-4262-4247-9a8f-130562b18f34">
+		<set-variable value="#[payload]" doc:name="Output_Data" doc:id="3a97e2d6-6618-4a26-b76c-18e3c85baafb" variableName="Output_Data" />
+		<set-payload value="#[%dw 2.0
+output application/json
+---
+p('Destinations') splitBy ',']" doc:name="Destination List" doc:id="f764ef9f-fa9a-4b8e-8b6c-bb0eed68eb20" />
+		<foreach doc:name="For Each" doc:id="f16e2412-5917-4257-bb92-892e117ef4bb">
+			<set-variable value="#[payload]" doc:name="Dest_System" doc:id="7e6d5ca8-f0bd-4b44-bdf8-07015272adf0" variableName="Dest_System" />
+			<set-payload value="#[%dw 2.0
+output application/json
+---
+p(vars.Dest_System ++ '.Instances') splitBy ',']" doc:name="Dest System Instance_List" doc:id="c6f32c1e-e072-4828-a9fa-d00f6235de5d" />
+			<foreach doc:name="For Each" doc:id="236b6d2b-59a5-4a81-8dd6-92db79cae471">
+				<set-variable value="#[payload]" doc:name="Dest_System_Instance" doc:id="17925413-5ada-44f0-b4f7-42f354df3f60" variableName="Dest_System_Instance" />
+				<choice doc:name="Choice" doc:id="9cf87870-5af2-4c4c-ade9-ed11214eeb69">
+					<when expression="#[p(vars.Dest_System ++ '.' ++ vars.Dest_System_Instance ++ '.Communication') == 'AMQ']">
+						<jms:publish doc:name="Destination_System_Instance Queue" doc:id="01803d54-c03c-4050-a67d-fb9b903cbb5e" config-ref="JMS_Config" destination="#[p(vars.Dest_System ++ '.' ++ vars.Dest_System_Instance ++ '.Inbound_Queue')]" persistentDelivery="true" timeToLive="${JMSBroker.TimetoLive}" timeToLiveUnit="DAYS">
+							<jms:message>
+								<jms:body><![CDATA[#[vars.Output_Data]]]></jms:body>
+							</jms:message>
+						</jms:publish>
+					</when>
+				</choice>
+			</foreach>
+		</foreach>
+	</sub-flow>
+
+
+
+</mule>

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:eframework="http://www.mulesoft.org/schema/mule/eframework"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/eframework http://www.mulesoft.org/schema/mule/eframework/current/mule-eframework.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+		<flow name="Outbound_SingleLocPO_Control" doc:id="5bfb5794-a933-4c91-a06d-563fac6e3c5f" >
+		<logger level="INFO" doc:name="Logger" doc:id="4d31675a-3ead-48cb-bf07-217e72e35850" message="#['\n\t PO Processing Started']"/>
+		<flow-ref doc:name="getCrossRef_RCPT_SINGLE_LOC_PO" doc:id="a862b6c4-22dd-4c12-9b0c-957e45b2d5a4" name="getCrossRef_RCPT_SINGLE_LOC_PO"/>
+		<logger level="INFO" doc:name="Logger" doc:id="54e4f8a4-1acc-43df-9772-a043e3e85e23" message="#['\n\t CrossRef values are obtained']"/>
+		<flow-ref doc:name="Outbound_SingleLocPO_Process" doc:id="af765433-efcd-49b8-8a4d-038438c8b45e" name="Outbound_SingleLocPO_Process"/>
+	</flow>
+	<sub-flow name="Outbound_SingleLocPO_Process" doc:id="6bb03e64-4f77-4697-9ac5-07f370b98faa" >
+		<set-variable value="#['Received']" doc:name="Action" doc:id="6298acac-649e-4bf2-aab0-1d8ae8d3882a" variableName="Action"/>
+		<file:read doc:name="Read CSV" doc:id="4e556bf7-6b21-41e8-9855-4819b4241918" config-ref="MMS_In_Config" path="#[vars.Global.FileName]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b70c42e8-3db6-416a-b09a-f970117d8dbd" message="#['\n\t Input CSV Read']"/>
+		<flow-ref doc:name="Store CSV to Message Store" doc:id="70f13313-bb4b-4e00-8793-11b35d593f28" name="MessageStore-Store-FromMMS-Flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="fd3ff507-f922-45ff-a9f0-e264f8cef10a" message="#['\n\t Input CSV stored into message store']"/>
+		<ee:transform doc:name="Transform Message" doc:id="4806f280-9928-4f04-b20f-28c525a4fac0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var PO =  (payload orderBy $.PCGKEY groupBy $.PCGKEY) pluck $
+---
+(PO map (Hdr,Hdrindex) ->{
+	POMHDR: {
+		PCGCDE : Hdr[0].PCGCDE,
+		PCGNBR : Hdr[0].PCGNBR,
+		PCGKEY : Hdr[0].PCGKEY,
+		BACKORDER : Hdr[0].BACKORDER,
+		POBO : Hdr[0].POBO,
+		PONUMB  : Hdr[0].PONUMB ,
+		POBON  : Hdr[0].POBON ,
+		POLOC  : Hdr[0].POSTOR ,
+		POVNUM  : Hdr[0].POVNUM ,
+		POSTAT  : Hdr[0].POSTAT ,
+		POORIG  : Hdr[0].POORIG,
+		POSHPP  : Hdr[0].POSHPP,
+		POEDAT  : Hdr[0].POEDAT 
+		},
+	
+	POMDTL: Hdr map (Dtl,Dtlidx) ->{
+		PVNDPN  : Dtl.PVNDPN ,
+		INUMBR  : Dtl.INUMBR,
+		POMQTY  : Dtl.POMQTY,
+		POMORG  : Dtl.POMORG,
+//Added below WPLINE as part of 5.4 version changes
+		WPLINE  : Dtl.WPLINE,  
+//PEGD 669 Added the field CTYORG
+		CDTCDE : Dtl.CDTCDE
+		}
+				
+		}
+)
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c6e36670-b924-488a-9135-a615877da59a" message="#[payload]"/>
+		<choice doc:name="Choice" doc:id="39b92a43-8581-4eaa-b902-e02cc5b1ca5c" >
+			<when expression="#[sizeOf(payload) != 0]">
+				<flow-ref doc:name="Outbound_SingleLocPO_BatchProcess" doc:id="bde6bb1a-f782-4201-948a-9601bc6bff6d" name="Outbound_SingleLocPO_BatchProcess" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="fc03a7cd-785b-470f-bb2c-fb1a62495875" message="#['\n\t Process Completed: No Payload to process']"/>
+
+			</otherwise>
+		
+</choice>
+	</sub-flow>
+			<flow name="Outbound_SingleLocPO_BatchProcess" doc:id="1241bf1d-47bf-4144-a6f9-d142915d670d" >
+		<batch:job jobName="mms-wms-singleloc-po-batch" doc:id="661192dd-326b-4aed-9fe2-95676744a321" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="56d86721-77a4-4fe3-b9aa-f2668a3ec7f5" >
+					<flow-ref doc:name="GeneratePOxml" doc:id="f7f7859b-4da3-4fb0-af45-0ac5d14677a0" name="Outbound_SingleLocPO_GeneratePOxml"/>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+	</flow>
+		<sub-flow name="Outbound_SingleLocPO_GeneratePOxml" doc:id="2569e76f-5c36-4e80-8c8a-e8f52dc48908" >
+		<try doc:name="Try" doc:id="dec96e18-9f30-438f-9e96-b0e525b422d9" >
+			<logger level="INFO" doc:name="Logger" doc:id="13a51683-4e34-42cc-9770-b8fdc7bcc7e2" message="#['\n\t Inside BATCH job']"/>
+			<set-variable value="#[payload.POMHDR]" doc:name="POMHDR" doc:id="d0170498-d9f4-48a1-b8c5-9538d63d334c" variableName="POMHDR" />
+			<set-payload value="#[payload.POMDTL]" doc:name="Set Payload to POMDTL" doc:id="c228379e-39b7-4b6f-b244-b05d814aa7f4" />
+			<validation:is-true doc:id="310927a7-555b-4647-a520-55ca7c194943" expression="#[sizeOf(payload) != 0 ]" message="#[vars.Global.MMSInstanceName ++ '_' ++ vars.POMHDR.PCGKEY default ' ' ++ &quot; No records found &quot;]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="3e46c434-d403-492a-b665-063f3d0ee925" message="#['\n\t Before Main Transform']"/>
+			<choice doc:name="Choice" doc:id="8a54e454-49f3-44b0-925e-14d878e587ab" >
+				<when expression="#[vars.POMHDR.PCGCDE == 'D']">
+					<ee:transform doc:name="Transform Message" doc:id="03845a3e-97e7-4dcd-a148-4b23529f4037" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml  skipNullOn='everywhere'
+var DftIFD 		= vars.PO_Single_Loc_CrossRefValues
+//var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+//var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+var wareHouse 	= vars.POMHDR.PCGNBR as String
+//var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+//var POChar		= trim(vars.POMHDR.PONUMB as String)
+//var POpaded		= ('000000000000000' ++ POChar)[sizeOf(POChar) to (sizeOf(POChar) + 14)]
+//var TrukDtl		=  client ++ 'S' ++ POpaded
+//fun DateConv (date6) = date6 + 20000000
+//fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+//fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+
+---
+{
+	RA_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			HEADER_SEG: {
+				SEGNAM: DftIFD."HEADER_SEG"."SEGNAM"[0],
+				TRNTYP: vars.POMHDR.PCGCDE,
+				INVNUM: vars.POMHDR.PCGKEY,			
+				}
+			}
+		}			
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</when>
+				<otherwise >
+					<ee:transform doc:name="mapping" doc:id="0fc559c8-dda2-483e-abdc-21ca967663f2">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml  skipNullOn='everywhere'
+var DftIFD 		= vars.PO_Single_Loc_CrossRefValues
+var StrPref 	= DftIFD."HOSTMAP"."STRPRE" default ''
+var VndPrex 	= DftIFD."HOSTMAP"."VENDORPRE" default ''
+var wareHouse 	= vars.POMHDR.POLOC as String
+var client		= DftIFD."HOSTMAP"."CLIENT_ID"[0] default ''
+var POChar		= trim(vars.POMHDR.PONUMB as String)
+var POpaded		= ('000000000000000' ++ POChar)[sizeOf(POChar) to (sizeOf(POChar) + 14)]
+var TrukDtl		=  client ++ 'S' ++ POpaded
+fun DateConv (date6) = date6 + 20000000
+fun getStr(Store) = StrPref[0] ++ ('00000' ++ Store)[sizeOf(Store) to (sizeOf(Store) + 4)]
+fun getVnd(Vendor) = VndPrex[0] ++ ('000000' ++ Vendor)[sizeOf(Vendor) to (sizeOf(Vendor) + 5)]
+
+---
+{
+	RA_INB_IFD: {
+		CTRL_SEG: {
+			TRNNAM: DftIFD."CTRL_SEG"."TRNNAM"[0],
+			TRNVER: DftIFD."CTRL_SEG"."TRNVER"[0],
+			WHSE_ID: DftIFD."WHSE_ID"."$wareHouse"[0],
+			HEADER_SEG: {
+				SEGNAM: DftIFD."HEADER_SEG"."SEGNAM"[0],
+// PEG-1501
+//				TRNTYP: if (vars.POMHDR.PCGCDE == 'U') 'C' else vars.POMHDR.PCGCDE,
+// As per version 4.8, changing 'C' to 'R'
+				TRNTYP: if (vars.POMHDR.PCGCDE == 'U') 'R' else vars.POMHDR.PCGCDE,
+				INVNUM: vars.POMHDR.PONUMB,
+				SUPNUM: getVnd(vars.POMHDR.POVNUM as String),
+				RIMSTS: if (vars.POMHDR.POSTAT == '1' or vars.POMHDR.POSTAT == '2' or vars.POMHDR.POSTAT == '3' or vars.POMHDR.POSTAT == '5') 'OPEN' else 'CLSD', 
+//				INVTYP: DftIFD."HEADER_SEG"."INVTYP"[0],
+				INVTYP: vars.POMHDR.POORIG,
+//				INVDTE: payload[0].POEDAT,
+				INVDTE: if (vars.POMHDR.POEDAT != 0) DateConv(vars.POMHDR.POEDAT) as String else null,
+				ORGREF: vars.POMHDR.PONUMB,
+				SADNUM: DftIFD."HEADER_SEG"."SADNUM"[0],
+				WAYBIL: DftIFD."HEADER_SEG"."WAYBIL"[0],
+				CSTMS_TYP: DftIFD."HEADER_SEG"."CSTMS_TYP"[0],
+				(payload map(val, idx) -> {
+					LINE_SEG: {
+					SEGNAM: DftIFD."LINE_SEG"."SEGNAM"[0],
+//					INVLIN: 10 * (idx + 1),
+// Commented below INVLIN as part of 5.4 version changes                        
+//					INVLIN: val.INUMBR,
+                    INVLIN:   val.WPLINE,
+					INVSLN: DftIFD."LINE_SEG"."INVSLN"[0],
+//					EXPQTY: val.POMQTY,
+// Use POMORG instead of POMQTY
+					EXPQTY: val.POMORG,
+		 			PRTNUM: val.PVNDPN,
+					ORGCOD: DftIFD."LINE_SEG"."ORGCOD"[0],
+					REVLVL: DftIFD."LINE_SEG"."REVLVL"[0],
+					LOTNUM: DftIFD."LINE_SEG"."LOTNUM"[0],
+					TOHSTA: DftIFD."LINE_SEG"."TOHSTA"[0],
+					RETCOD: DftIFD."LINE_SEG"."RETCOD"[0],
+//					RCVSTS: DftIFD."LINE_SEG"."RCVSTS"[0],
+					RCVSTS: if (vars.POMHDR.POSHPP == 'SL01') 'I' else 'A',
+					EXP_CATCH_QTY: DftIFD."LINE_SEG"."EXP_CATCH_QTY"[0],
+					MANDTE: DftIFD."LINE_SEG"."MANDTE"[0],
+//PEGD 669 Added the field PRGCOD
+                    PRGCOD: if (val.CDTCDE !='') val.CDTCDE[0] else ''
+					}
+				})
+				
+				}
+			}
+		}			
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				</otherwise>
+			</choice>
+			<set-variable value="#[%dw 2.0
+output application/json
+---
+payload.RA_INB_IFD.CTRL_SEG.WHSE_ID]" doc:name="WMS_Instance" doc:id="7d5fc353-a6f3-4a33-89fe-fa7c007079ea" variableName="WMS_Instance"/>
+			<set-variable value="#[%dw 2.0 output application/json 
+--- 
+vars.Global.MMSInstanceName ++ '_' ++ 'PO_ST_' ++ trim(vars.POMHDR.PCGKEY) default '' ++ 
+'_' ++ (now() as String {format: &quot;yyyyMMddHHmmssSSS&quot;}) ++ '.xml']" doc:name="Out_FileName" doc:id="2a73eefb-dbff-4d0b-934c-5f6c8e7966f9" variableName="Out_FileName"/>
+			<set-variable value="#['Sent']" doc:name="Action" doc:id="910d173e-fa01-40a7-abbb-1f304afa3db7" variableName="Action"/>
+			<flow-ref doc:name="MessageStore-Store-FromMMS-Flow" doc:id="7efe0d70-97f3-4f50-9dbe-d290a76fcef5" name="MessageStore-Store-FromMMS-Flow"/>
+			<jms:publish doc:name="Publish" doc:id="67d1eb23-c1b0-4a6d-9ab6-2e076277082c" config-ref="JMS_Config" destination="#[p('Queue.Outbound.' ++ vars.WMS_Instance)]" persistentDelivery="true" timeToLive="${JMSBroker.TimetoLive}" timeToLiveUnit="DAYS"/>
+			<logger level="INFO" doc:name="Logger" doc:id="ad784a7f-4e94-45bc-b93c-286dcd3d5e00" message="#[vars.Out_FileName ++ 'Published to the Queue']"/>
+			<error-handler>
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f2561538-0bf5-4647-b485-75005627d47e" >
+					<flow-ref doc:name="GenErrorReport" doc:id="1fb220ef-ba0f-434c-9359-803d7505c13c" name="GenErrorReport"/>
+				</on-error-continue>
+
+			</error-handler>
+		
+</try>
+	</sub-flow>
+</mule>
